@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -13,11 +12,7 @@ import (
 )
 
 func resetStorage() {
-	storage.Store = make(map[string]string)
-	storage.Expiry = make(map[string]time.Time)
-	storage.Lists = make(map[string]any)
-	storage.Streams = make(map[string]*storage.Stream)
-	storage.Mu = sync.RWMutex{}
+	storage.DB.Clear()
 }
 
 // TestSaveAndLoadStrings verifies basic round-trip: save keys, clear, load, check values restored.
@@ -67,7 +62,7 @@ func TestSaveAndLoadStrings(t *testing.T) {
 
 			// Set keys
 			for k, v := range tc.keys {
-				storage.Store[k] = v
+				storage.DB.Set(k, v)
 			}
 
 			// Save
@@ -85,14 +80,17 @@ func TestSaveAndLoadStrings(t *testing.T) {
 
 			// Verify all keys restored correctly
 			for k, expected := range tc.keys {
-				if got := storage.Store[k]; got != expected {
+				got, ok := storage.DB.Get(k)
+				if !ok {
+					t.Errorf("key %q: not found", k)
+				} else if got != expected {
 					t.Errorf("key %q: expected %q, got %q", k, expected, got)
 				}
 			}
 
 			// Verify no extra keys loaded
-			if len(storage.Store) != len(tc.keys) {
-				t.Errorf("expected %d keys, got %d", len(tc.keys), len(storage.Store))
+			if len(storage.DB.Keys()) != len(tc.keys) {
+				t.Errorf("expected %d keys, got %d", len(tc.keys), len(storage.DB.Keys()))
 			}
 		})
 	}
@@ -105,13 +103,9 @@ func TestSaveAndLoadWithTTL(t *testing.T) {
 	defer os.Remove(testFile)
 
 	// Setup: three keys with different TTL behaviors
-	storage.Store["future"] = "expires_later"
-	storage.Expiry["future"] = time.Now().Add(1 * time.Hour)
-
-	storage.Store["expired"] = "should_not_load"
-	storage.Expiry["expired"] = time.Now().Add(-1 * time.Hour)
-
-	storage.Store["permanent"] = "forever"
+	storage.DB.SetWithTTL("future", "expires_later", 1*time.Hour)
+	storage.DB.SetWithTTL("expired", "should_not_load", -1*time.Hour)
+	storage.DB.Set("permanent", "forever")
 
 	// Save and reload
 	if err := Save(testFile); err != nil {
@@ -123,29 +117,33 @@ func TestSaveAndLoadWithTTL(t *testing.T) {
 	}
 
 	// Check: future TTL preserved
-	if storage.Store["future"] != "expires_later" {
-		t.Error("future TTL: key should exist")
+	val, ok := storage.DB.Get("future")
+	if !ok || val != "expires_later" {
+		t.Error("future TTL: key should exist with correct value")
 	}
-	if _, hasTTL := storage.Expiry["future"]; !hasTTL {
+	ttlResult := storage.DB.TTL("future")
+	if !ttlResult.HasTTL {
 		t.Error("future TTL: should have TTL")
 	}
 
 	// Check: expired TTL not loaded
-	if _, exists := storage.Store["expired"]; exists {
+	if storage.DB.Exists("expired") {
 		t.Error("expired TTL: should not be loaded")
 	}
 
-	// Check: no TTL keys exists and still have no TTL
-	if storage.Store["permanent"] != "forever" {
-		t.Error("no TTL: key should exist")
+	// Check: no TTL key exists and still has no TTL
+	val, ok = storage.DB.Get("permanent")
+	if !ok || val != "forever" {
+		t.Error("no TTL: key should exist with correct value")
 	}
-	if _, hasTTL := storage.Expiry["permanent"]; hasTTL {
+	ttlResult = storage.DB.TTL("permanent")
+	if ttlResult.HasTTL {
 		t.Error("no TTL: should not have TTL")
 	}
 
 	// Verify total count (only 2 keys: future + permanent)
-	if len(storage.Store) != 2 {
-		t.Errorf("expected 2 keys, got %d", len(storage.Store))
+	if len(storage.DB.Keys()) != 2 {
+		t.Errorf("expected 2 keys, got %d", len(storage.DB.Keys()))
 	}
 }
 
@@ -158,8 +156,8 @@ func TestLoadNonExistentFile(t *testing.T) {
 		t.Errorf("expected error for non-existent file")
 	}
 
-	if len(storage.Store) != 0 {
-		t.Errorf("storage should remain empty, got %d keys", len(storage.Store))
+	if len(storage.DB.Keys()) != 0 {
+		t.Errorf("storage should remain empty, got %d keys", len(storage.DB.Keys()))
 	}
 }
 
@@ -179,8 +177,8 @@ func TestSaveEmptyDatabase(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	if len(storage.Store) != 0 {
-		t.Errorf("storage should be empty, got %d keys", len(storage.Store))
+	if len(storage.DB.Keys()) != 0 {
+		t.Errorf("storage should be empty, got %d keys", len(storage.DB.Keys()))
 	}
 }
 
@@ -190,7 +188,7 @@ func TestSaveAtomicWrite(t *testing.T) {
 	testFile := "test_atomic.rdb"
 	defer os.Remove(testFile)
 
-	storage.Store["key"] = "value"
+	storage.DB.Set("key", "value")
 
 	err := Save(testFile)
 	if err != nil {
@@ -220,7 +218,7 @@ func TestKeyCountBulk(t *testing.T) {
 
 			// Add keys
 			for i := 0; i < count; i++ {
-				storage.Store[fmt.Sprintf("key%d", i)] = fmt.Sprintf("value%d", i)
+				storage.DB.Set(fmt.Sprintf("key%d", i), fmt.Sprintf("value%d", i))
 			}
 
 			err := Save(testFile)
@@ -235,8 +233,8 @@ func TestKeyCountBulk(t *testing.T) {
 				t.Fatalf("Load failed: %v", err)
 			}
 
-			if len(storage.Store) != count {
-				t.Errorf("expected %d keys, got %d", count, len(storage.Store))
+			if len(storage.DB.Keys()) != count {
+				t.Errorf("expected %d keys, got %d", count, len(storage.DB.Keys()))
 			}
 		})
 	}
@@ -303,7 +301,7 @@ func TestLargeValues(t *testing.T) {
 		largeValue[i] = byte(i % 256)
 	}
 
-	storage.Store["large"] = string(largeValue)
+	storage.DB.Set("large", string(largeValue))
 
 	err := Save(testFile)
 	if err != nil {
@@ -317,7 +315,8 @@ func TestLargeValues(t *testing.T) {
 		t.Fatalf("Load failed: %v", err)
 	}
 
-	if storage.Store["large"] != string(largeValue) {
+	got, ok := storage.DB.Get("large")
+	if !ok || got != string(largeValue) {
 		t.Errorf("large value corrupted after save/load")
 	}
 }

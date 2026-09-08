@@ -7,7 +7,12 @@ import (
 	"net"
 )
 
+// DB is the global database instance (for gradual migration from globals)
+var DB = New()
+
+// Deprecated: use DB.Get/Set instead
 var Store = make(map[string]string)
+// Deprecated: use DB methods instead
 var Expiry = make(map[string]time.Time)
 var Waiters = make(map[string][]chan [2]string)
 var Mu sync.RWMutex

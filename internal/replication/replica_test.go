@@ -15,6 +15,7 @@ import (
 )
 
 func TestStartReplicaAppliesPropagatedSET(t *testing.T) {
+	storage.DB.Clear()
 	storage.Store = make(map[string]string)
 	storage.Expiry = make(map[string]time.Time)
 	storage.Lists = make(map[string]any)
@@ -91,18 +92,14 @@ func TestStartReplicaAppliesPropagatedSET(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		storage.Mu.RLock()
-		v, ok := storage.Store["replicated"]
-		storage.Mu.RUnlock()
+		v, ok := storage.DB.Get("replicated")
 		if ok && v == "value" {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	storage.Mu.RLock()
-	v, ok := storage.Store["replicated"]
-	storage.Mu.RUnlock()
+	v, ok := storage.DB.Get("replicated")
 	if !ok || v != "value" {
 		t.Fatalf("expected replica to apply replicated SET, got key=%q value=%q present=%v", "replicated", v, ok)
 	}

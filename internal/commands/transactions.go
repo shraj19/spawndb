@@ -1,45 +1,10 @@
 package commands
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/shraj19/flashdb/internal/storage"
 )
-
-func INCR(args []string, client *storage.Client) string {
-	if len(args) != 2 {
-		return "-ERR wrong number of arguments for 'incr'\r\n"
-	}
-
-	key := args[1]
-
-	// Locking the storage for safe concurrent access
-	storage.Mu.Lock()
-	defer storage.Mu.Unlock()
-
-	// Retrieving current value
-	stringsMap := storage.GetStore()
-
-	currentValue, exists := stringsMap[key]
-	if !exists {
-		currentValue = "0"
-	}
-
-	// Parsing current value as integer
-	intValue, err := strconv.Atoi(currentValue)
-	if err != nil {
-		return "-ERR value is not an integer or out of range\r\n"
-	}
-
-	// Incrementing the value
-	intValue++
-	// Storing the new value
-	stringsMap[key] = strconv.Itoa(intValue)
-	
-	// Responding with the new value
-	return fmt.Sprintf(":%d\r\n", intValue)
-}
 
 func MULTI(args []string, client *storage.Client) string {
 	if len(args) != 1 {

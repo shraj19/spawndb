@@ -36,28 +36,35 @@ func Save(path string) error {
 		return err
 	}
 
-	// Write entries
-	for key, value := range storage.Store {
-		// Skip expired keys
-		if expiry, exists := storage.Expiry[key]; exists && time.Now().After(expiry) {
-			continue
+	// Write entries using Database iterator
+	var writeErr error
+	storage.DB.ForEachString(func(key, value string, expiry time.Time, hasTTL bool) {
+		if writeErr != nil {
+			return
 		}
 
 		if err := writeString(file, key); err != nil {
-			return err
+			writeErr = err
+			return
 		}
 		if err := writeString(file, value); err != nil {
-			return err
+			writeErr = err
+			return
 		}
 
 		// Write expiry (0 if no TTL)
 		var expiryUnix int64
-		if expiry, exists := storage.Expiry[key]; exists {
+		if hasTTL {
 			expiryUnix = expiry.Unix()
 		}
 		if err := binary.Write(file, binary.BigEndian, expiryUnix); err != nil {
-			return err
+			writeErr = err
+			return
 		}
+	})
+
+	if writeErr != nil {
+		return writeErr
 	}
 
 	if err := file.Close(); err != nil {
@@ -91,7 +98,6 @@ func Load(path string) error {
 	// Read entries
 	for {
 		key, err := readString(file)
-		// Here we check for EOF to break the loop, but any other error should be returned.
 		if err == io.EOF {
 			break
 		}
@@ -114,11 +120,13 @@ func Load(path string) error {
 			continue
 		}
 
-		// Store entry
-		storage.Store[key] = value
-		if expiryUnix != 0 {
-			storage.Expiry[key] = time.Unix(expiryUnix, 0)
+		// Load into database
+		hasTTL := expiryUnix != 0
+		var expiry time.Time
+		if hasTTL {
+			expiry = time.Unix(expiryUnix, 0)
 		}
+		storage.DB.LoadString(key, value, expiry, hasTTL)
 	}
 
 	return nil
