@@ -1,16 +1,16 @@
 package commands
 
 import (
-	"fmt"
 	"strconv"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 )
 
 func RPUSH(args []string, client *storage.Client) string {
 	if len(args) < 3 {
-		return "-ERR wrong number of arguments for 'rpush'\r\n"
+		return resp.Error("wrong number of arguments for 'rpush'")
 	}
 
 	storage.Mu.Lock()
@@ -41,12 +41,12 @@ func RPUSH(args []string, client *storage.Client) string {
 
 	storage.Lists[key] = list
 
-	return fmt.Sprintf(":%d\r\n", len(list)+delivered)
+	return resp.Integer(int64(len(list) + delivered))
 }
 
 func LPUSH(args []string, client *storage.Client) string {
 	if len(args) < 3 {
-		return "-ERR wrong number of arguments for 'lpush'\r\n"
+		return resp.Error("wrong number of arguments for 'lpush'")
 	}
 
 	storage.Mu.Lock()
@@ -78,29 +78,29 @@ func LPUSH(args []string, client *storage.Client) string {
 	}
 
 	storage.Lists[key] = list
-	return fmt.Sprintf(":%d\r\n", len(list)+delivered)
+	return resp.Integer(int64(len(list) + delivered))
 }
 
 func LRANGE(args []string, client *storage.Client) string {
 	if len(args) != 4 {
-		return "-ERR wrong number of arguments for 'lrange'\r\n"
+		return resp.Error("wrong number of arguments for 'lrange'")
 	}
 	key := args[1]
 
 	start, err1 := strconv.Atoi(args[2])
 	stop, err2 := strconv.Atoi(args[3])
 	if err1 != nil || err2 != nil {
-		return "-ERR start or stop is not an integer\r\n"
+		return resp.Error("start or stop is not an integer")
 	}
 
 	val, ok := storage.Lists[key]
 	if !ok {
-		return "*0\r\n"
+		return resp.EmptyArray()
 	}
 
 	list, ok := val.([]string)
 	if !ok {
-		return "*0\r\n"
+		return resp.EmptyArray()
 	}
 
 	if start < 0 {
@@ -122,19 +122,15 @@ func LRANGE(args []string, client *storage.Client) string {
 	}
 
 	if start > stop || start >= len(list) {
-		return "*0\r\n"
+		return resp.EmptyArray()
 	}
-	var resp string
-	resp += fmt.Sprintf("*%d\r\n", stop-start+1)
-	for i := start; i <= stop; i++ {
-		resp += fmt.Sprintf("$%d\r\n%s\r\n", len(list[i]), list[i])
-	}
-	return resp
+
+	return resp.Array(list[start : stop+1])
 }
 
 func LLEN(args []string, client *storage.Client) string {
 	if len(args) < 2 {
-		return "-ERR wrong number of arguments for 'llen'\r\n"
+		return resp.Error("wrong number of arguments for 'llen'")
 	}
 
 	storage.Mu.RLock()
@@ -142,27 +138,27 @@ func LLEN(args []string, client *storage.Client) string {
 
 	val, ok := storage.Lists[args[1]]
 	if !ok {
-		return ":0\r\n"
+		return resp.Integer(0)
 	}
 
 	list, ok := val.([]string)
 	if !ok {
-		return "-ERR wrong type for key\r\n"
+		return resp.Error("wrong type for key")
 	}
 
-	return fmt.Sprintf(":%d\r\n", len(list))
+	return resp.Integer(int64(len(list)))
 }
 
 func LPOP(args []string, client *storage.Client) string {
 	if len(args) < 2 {
-		return "-ERR wrong number of arguments for 'lpop'\r\n"
+		return resp.Error("wrong number of arguments for 'lpop'")
 	}
 
 	count := 1
 	if len(args) >= 3 {
 		n, err := strconv.Atoi(args[2])
 		if err != nil || n < 0 {
-			return "-ERR count is not a valid integer\r\n"
+			return resp.Error("count is not a valid integer")
 		}
 		count = n
 	}
@@ -173,26 +169,26 @@ func LPOP(args []string, client *storage.Client) string {
 	val, ok := storage.Lists[args[1]]
 	if !ok {
 		if count > 1 {
-			return "*0\r\n"
+			return resp.EmptyArray()
 		} else {
-			return "$-1\r\n"
+			return resp.NullBulkString()
 		}
 	}
 
 	list, ok := val.([]string)
 	if !ok {
-		return "-ERR wrong type for key\r\n"
+		return resp.Error("wrong type for key")
 	}
 
 	if len(list) == 0 {
 		delete(storage.Lists, args[1])
 		if count > 1 {
-			return "*0\r\n"
+			return resp.EmptyArray()
 		} else {
-			return "$-1\r\n"
+			return resp.NullBulkString()
 		}
 	}
-	
+
 	if count > len(list) {
 		count = len(list)
 	}
@@ -200,15 +196,11 @@ func LPOP(args []string, client *storage.Client) string {
 	poppedElements := list[:count]
 
 	// Format response
-	var resp string
+	var result string
 	if count == 1 {
-		elem := poppedElements[0]
-		resp = fmt.Sprintf("$%d\r\n%s\r\n", len(elem), elem)
+		result = resp.BulkString(poppedElements[0])
 	} else {
-		resp += fmt.Sprintf("*%d\r\n", count)
-		for _, elem := range poppedElements {
-			resp += fmt.Sprintf("$%d\r\n%s\r\n", len(elem), elem)
-		}
+		result = resp.Array(poppedElements)
 	}
 
 	// Trim list
@@ -218,18 +210,18 @@ func LPOP(args []string, client *storage.Client) string {
 	} else {
 		storage.Lists[args[1]] = list
 	}
-	return resp
+	return result
 }
 
 func BLPOP(args []string, client *storage.Client) string {
 	if len(args) < 3 {
-		return "-ERR wrong number of arguments for 'blpop'\r\n"
+		return resp.Error("wrong number of arguments for 'blpop'")
 	}
 
 	key := args[1]
 	timeoutSec, err := strconv.ParseFloat(args[2], 64)
 	if err != nil {
-		return "-ERR timeout is not a float\r\n"
+		return resp.Error("timeout is not a float")
 	}
 
 	storage.Mu.Lock()
@@ -242,8 +234,7 @@ func BLPOP(args []string, client *storage.Client) string {
 			list = list[1:]
 			storage.Lists[key] = list
 			storage.Mu.Unlock()
-			return fmt.Sprintf("*2\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n",
-				len(key), key, len(elem), elem)
+			return resp.Array([]string{key, elem})
 		}
 	}
 
@@ -259,10 +250,9 @@ func BLPOP(args []string, client *storage.Client) string {
 
 	select {
 	case kv := <-waitCh:
-		client.Conn.Write([]byte(fmt.Sprintf("*2\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n",
-			len(kv[0]), kv[0], len(kv[1]), kv[1])))
+		client.Conn.Write([]byte(resp.Array([]string{kv[0], kv[1]})))
 	case <-timeout:
-		client.Conn.Write([]byte("*-1\r\n"))
+		client.Conn.Write([]byte(resp.NullArray()))
 	}
 
 	storage.Mu.Lock()

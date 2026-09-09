@@ -42,7 +42,7 @@ func HandleConnection(conn net.Conn) {
 
 		handler, ok := storage.CommandMap[cmdName]
 		if !ok {
-			client.Conn.Write([]byte(fmt.Sprintf("-ERR unknown command '%s'\r\n", args[0])))
+			client.Conn.Write([]byte(resp.Error(fmt.Sprintf("unknown command '%s'", args[0]))))
 			continue
 		}
 
@@ -50,13 +50,13 @@ func HandleConnection(conn net.Conn) {
 		if client.InTransaction && cmdName != "EXEC" && cmdName != "DISCARD" {
 			// Commands like MULTI are not allowed inside a transaction
 			if cmdName == "MULTI" {
-				client.Conn.Write([]byte("-ERR MULTI calls can not be nested\r\n"))
+				client.Conn.Write([]byte(resp.Error("MULTI calls can not be nested")))
 				continue
 			}
 
 			// Queue the valid command
 			client.QueuedCommands = append(client.QueuedCommands, args)
-			client.Conn.Write([]byte("+QUEUED\r\n"))
+			client.Conn.Write([]byte(resp.SimpleString("QUEUED")))
 			continue
 		}
 

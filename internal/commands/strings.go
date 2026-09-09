@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -12,7 +11,7 @@ import (
 
 func SETvalue(args []string, client *storage.Client) string {
 	if len(args) < 3 {
-		return "-ERR wrong number of arguments for 'set'\r\n"
+		return resp.Error("wrong number of arguments for 'set'")
 	}
 
 	key, value := args[1], args[2]
@@ -26,19 +25,19 @@ func SETvalue(args []string, client *storage.Client) string {
 		case "EX":
 			seconds, err := strconv.Atoi(args[4])
 			if err != nil {
-				return "-ERR invalid expire time\r\n"
+				return resp.Error("invalid expire time")
 			}
 			ttl = time.Duration(seconds) * time.Second
 			hasTTL = true
 		case "PX":
 			ms, err := strconv.Atoi(args[4])
 			if err != nil {
-				return "-ERR invalid expire time\r\n"
+				return resp.Error("invalid expire time")
 			}
 			ttl = time.Duration(ms) * time.Millisecond
 			hasTTL = true
 		default:
-			return "-ERR syntax error\r\n"
+			return resp.Error("syntax error")
 		}
 	}
 
@@ -61,33 +60,33 @@ func SETvalue(args []string, client *storage.Client) string {
 		}
 		replication.Mu.RUnlock()
 	}
-	return "+OK\r\n"
+	return resp.OK()
 }
 
 func GETvalue(args []string, client *storage.Client) string {
 	if len(args) < 2 {
-		return "-ERR wrong number of arguments for 'get'\r\n"
+		return resp.Error("wrong number of arguments for 'get'")
 	}
 
 	key := args[1]
 	value, ok := storage.DB.Get(key)
 
 	if !ok {
-		return "$-1\r\n"
+		return resp.NullBulkString()
 	}
-	return fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)
+	return resp.BulkString(value)
 }
 
 func TYPE(args []string, client *storage.Client) string {
 	if len(args) != 2 {
-		return "-ERR wrong number of arguments for 'type'\r\n"
+		return resp.Error("wrong number of arguments for 'type'")
 	}
 
 	key := args[1]
 
 	// Check string type
 	if storage.DB.Exists(key) {
-		return "+string\r\n"
+		return resp.SimpleString("string")
 	}
 
 	// Check stream type (still using old global for now)
@@ -95,7 +94,7 @@ func TYPE(args []string, client *storage.Client) string {
 	_, isStream := storage.Streams[key]
 	storage.Mu.RUnlock()
 	if isStream {
-		return "+stream\r\n"
+		return resp.SimpleString("stream")
 	}
 
 	// Check list type
@@ -103,15 +102,15 @@ func TYPE(args []string, client *storage.Client) string {
 	_, isList := storage.Lists[key]
 	storage.Mu.RUnlock()
 	if isList {
-		return "+list\r\n"
+		return resp.SimpleString("list")
 	}
 
-	return "+none\r\n"
+	return resp.SimpleString("none")
 }
 
 func INCR(args []string, client *storage.Client) string {
 	if len(args) < 2 {
-		return "-ERR wrong number of arguments for 'incr'\r\n"
+		return resp.Error("wrong number of arguments for 'incr'")
 	}
 
 	key := args[1]
@@ -128,7 +127,7 @@ func INCR(args []string, client *storage.Client) string {
 
 	num, err := strconv.ParseInt(val, 10, 64)
 	if err != nil {
-		return "-ERR value is not an integer or out of range\r\n"
+		return resp.Error("value is not an integer or out of range")
 	}
 
 	num++
@@ -147,5 +146,5 @@ func INCR(args []string, client *storage.Client) string {
 		replication.Mu.RUnlock()
 	}
 
-	return fmt.Sprintf(":%d\r\n", num)
+	return resp.Integer(num)
 }

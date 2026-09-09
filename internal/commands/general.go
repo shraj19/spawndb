@@ -12,16 +12,15 @@ import (
 
 // PING command
 func PING(args []string, client *storage.Client) string {
-	return "+PONG\r\n"
+	return resp.PONG()
 }
 
 // ECHO command
 func ECHO(args []string, client *storage.Client) string {
 	if len(args) < 2 {
-		return "-ERR wrong number of arguments for 'echo'\r\n"
+		return resp.Error("wrong number of arguments for 'echo'")
 	}
-	message := args[1]
-	return fmt.Sprintf("$%d\r\n%s\r\n", len(message), message)
+	return resp.BulkString(args[1])
 }
 
 // INFO command
@@ -39,11 +38,10 @@ func INFO(args []string, client *storage.Client) string {
 	case "replication":
 		info = buildReplicationInfo()
 	default:
-		return fmt.Sprintf("-ERR Unknown section '%s'\r\n", section)
+		return resp.Error(fmt.Sprintf("Unknown section '%s'", section))
 	}
 
-	// Return as bulk string
-	return fmt.Sprintf("$%d\r\n%s\r\n", len(info), info)
+	return resp.BulkString(info)
 }
 
 func buildServerInfo() string {
@@ -55,18 +53,18 @@ func buildServerInfo() string {
 
 func WAIT(args []string, client *storage.Client) string {
 	if len(args) < 3 {
-		return "-ERR wrong number of arguments for 'wait'\r\n"
+		return resp.Error("wrong number of arguments for 'wait'")
 	}
 
 	replication := storage.EnsureReplication()
 
 	numReplicas, err := strconv.Atoi(args[1])
 	if err != nil {
-		return "-ERR invalid number of replicas\r\n"
+		return resp.Error("invalid number of replicas")
 	}
 	timeoutMs, err := strconv.Atoi(args[2])
 	if err != nil {
-		return "-ERR invalid timeout\r\n"
+		return resp.Error("invalid timeout")
 	}
 
 	replication.Mu.RLock()
@@ -82,11 +80,11 @@ func WAIT(args []string, client *storage.Client) string {
 	}
 	replication.Mu.RUnlock()
 	if connected == 0 {
-		return ":0\r\n"
+		return resp.Integer(0)
 	}
 
 	if targetOffset == 0 {
-		return fmt.Sprintf(":%d\r\n", connected)
+		return resp.Integer(int64(connected))
 	}
 
 	replication.Mu.RLock()
@@ -120,10 +118,10 @@ func WAIT(args []string, client *storage.Client) string {
 	for {
 		acked := replication.CountReplicasAcked(targetOffset)
 		if acked >= numReplicas {
-			return fmt.Sprintf(":%d\r\n", acked)
+			return resp.Integer(int64(acked))
 		}
 		if time.Now().After(deadline) {
-			return fmt.Sprintf(":%d\r\n", acked)
+			return resp.Integer(int64(acked))
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
@@ -191,7 +189,7 @@ func REPLCONF(args []string, client *storage.Client) string {
 		}
 		replication.Mu.Unlock()
 		if returnOK {
-			return "+OK\r\n"
+			return resp.OK()
 		}
 	}
 	return ""

@@ -1,29 +1,31 @@
 package commands
+
 import (
 	"fmt"
 	"strings"
 
+	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 )
 
 func MULTI(args []string, client *storage.Client) string {
 	if len(args) != 1 {
-		return "-ERR wrong number of arguments for 'multi'\r\n"
+		return resp.Error("wrong number of arguments for 'multi'")
 	}
 
 	if client.InTransaction {
-		return "-ERR MULTI calls can not be nested\r\n"
+		return resp.Error("MULTI calls can not be nested")
 	}
 
 	client.InTransaction = true
 	client.QueuedCommands = [][]string{}
-	return "+OK\r\n"
+	return resp.OK()
 }
 
 func EXEC(args []string, client *storage.Client) string {
 	if !client.InTransaction {
-        return "-ERR EXEC without MULTI\r\n"
-    }
+		return resp.Error("EXEC without MULTI")
+	}
 
 	// Defer resetting the transaction state.
 	// This ensures it's cleaned up whether the transaction succeeds or fails.
@@ -38,11 +40,11 @@ func EXEC(args []string, client *storage.Client) string {
 	for _, cmdArgs := range client.QueuedCommands {
 		cmdName := strings.ToUpper(cmdArgs[0])
 		if cmdName == "DISCARD" || cmdName == "EXEC" || cmdName == "MULTI" {
-			return "-ERR EXEC aborted on invalid command in transaction\r\n"
+			return resp.Error("EXEC aborted on invalid command in transaction")
 		}
 		_, ok := storage.CommandMap[cmdName]
 		if !ok {
-			return "-ERR EXEC aborted on invalid command in transaction\r\n"
+			return resp.Error("EXEC aborted on invalid command in transaction")
 		}
 	}
 
@@ -58,20 +60,20 @@ func EXEC(args []string, client *storage.Client) string {
 
 	var respBuilder strings.Builder
 	respBuilder.WriteString(fmt.Sprintf("*%d\r\n", len(responses)))
-    for _, r := range responses {
-        respBuilder.WriteString(r)
-    }
+	for _, r := range responses {
+		respBuilder.WriteString(r)
+	}
 	return respBuilder.String()
 }
 
 func DISCARD(args []string, client *storage.Client) string {
 	if !client.InTransaction {
-		return "-ERR DISCARD without MULTI\r\n"
+		return resp.Error("DISCARD without MULTI")
 	}
 
 	// Reset transaction state
 	client.InTransaction = false
 	client.QueuedCommands = nil
 
-	return "+OK\r\n"
+	return resp.OK()
 }

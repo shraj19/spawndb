@@ -176,3 +176,62 @@ func encodeArray(b *strings.Builder, arr []any) error {
 	}
 	return nil
 }
+
+// --- Response helpers for command handlers ---
+
+// SimpleString returns a RESP simple string (e.g., +OK\r\n)
+func SimpleString(s string) string {
+	return "+" + s + "\r\n"
+}
+
+// OK returns +OK\r\n
+func OK() string {
+	return "+OK\r\n"
+}
+
+// PONG returns +PONG\r\n
+func PONG() string {
+	return "+PONG\r\n"
+}
+
+// Error returns a RESP error (e.g., -ERR message\r\n)
+func Error(msg string) string {
+	return "-ERR " + msg + "\r\n"
+}
+
+// BulkString returns a RESP bulk string
+func BulkString(s string) string {
+	return fmt.Sprintf("$%d\r\n%s\r\n", len(s), s)
+}
+
+// NullBulkString returns RESP null bulk string ($-1\r\n)
+func NullBulkString() string {
+	return "$-1\r\n"
+}
+
+// Integer returns a RESP integer
+func Integer(n int64) string {
+	return ":" + strconv.FormatInt(n, 10) + "\r\n"
+}
+
+// NullArray returns RESP null array (*-1\r\n)
+func NullArray() string {
+	return "*-1\r\n"
+}
+
+// EmptyArray returns RESP empty array (*0\r\n)
+func EmptyArray() string {
+	return "*0\r\n"
+}
+
+// Array encodes a slice as RESP array and returns as string
+func Array(items []string) string {
+	var b strings.Builder
+	b.WriteString("*")
+	b.WriteString(strconv.Itoa(len(items)))
+	b.WriteString("\r\n")
+	for _, item := range items {
+		b.WriteString(BulkString(item))
+	}
+	return b.String()
+}
