@@ -25,7 +25,7 @@ func ECHO(args []string, client *storage.Client) string {
 
 // INFO command
 func INFO(args []string, client *storage.Client) string {
-	section := "default"
+	section := "default" // section is default if not specified
 	if len(args) > 1 {
 		section = args[1]
 	}
@@ -40,7 +40,7 @@ func INFO(args []string, client *storage.Client) string {
 	default:
 		return resp.Error(fmt.Sprintf("Unknown section '%s'", section))
 	}
-
+	
 	return resp.BulkString(info)
 }
 

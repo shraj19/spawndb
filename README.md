@@ -6,11 +6,12 @@ A lightweight, concurrent, in-memory key-value database built in Go, implementin
 
 * **Custom Protocol Parser:** Built a raw TCP handler to parse RESP messages from scratch
 * **Concurrency Safe:** Handles concurrent read/writes using `sync.RWMutex` locks for optimal performance
-* **TTL Support:** Implemented active key expiration logic with time-based eviction
-* **Replication Support:** Added master/replica handshake flow, `REPLCONF`, `PSYNC`, and `WAIT` handling, plus offset tracking
-* **Stream Processing:** Support for Redis-like streams with consumer groups and blocking reads
-* **Transaction Support:** MULTI/EXEC/DISCARD transaction handling with rollback capabilities
-* **Persistent Monitoring:** Real-time metrics tracking for database health and performance
+* **TTL Support:** Implemented lazy key expiration with active background eviction
+* **Replication Support:** Master/replica handshake flow, `REPLCONF`, `PSYNC`, and `WAIT` handling with offset tracking
+* **Stream Processing:** Support for Redis-like streams with blocking reads
+* **Transaction Support:** MULTI/EXEC/DISCARD transaction handling with command queuing
+* **Persistence:** Binary snapshot persistence with atomic writes
+* **Basic Metrics:** Periodic logging of keys count, connected clients, and command count
 
 ## Tech Stack
 
@@ -24,14 +25,15 @@ A lightweight, concurrent, in-memory key-value database built in Go, implementin
 - `SET key value [EX seconds] [PX milliseconds]` - Set key with optional TTL
 - `GET key` - Retrieve value by key
 - `INCR key` - Increment integer value
-- `DEL key` - Delete key
+- `TYPE key` - Get the type of a key (string, list, stream, or none)
 
 ### List Operations
 - `LPUSH key value [value ...]` - Push to list head
 - `RPUSH key value [value ...]` - Push to list tail
-- `LPOP key` - Pop from list head
-- `RPOP key` - Pop from list tail
+- `LPOP key [count]` - Pop from list head
+- `BLPOP key timeout` - Blocking pop from list head
 - `LRANGE key start stop` - Get range of elements
+- `LLEN key` - Get list length
 
 ### Stream Operations
 - `XADD stream_key * field value [field value ...]` - Add entry to stream
@@ -40,35 +42,36 @@ A lightweight, concurrent, in-memory key-value database built in Go, implementin
 
 ### Transactions
 - `MULTI` - Start transaction
-- `EXEC` - Execute transaction
-- `DISCARD` - Abort transaction
+- `EXEC` - Execute queued commands
+- `DISCARD` - Abort transaction and discard queued commands
 
 ### General
 - `PING` - Health check
 - `ECHO message` - Echo message back
-- `INFO [section]` - Server information
-- `REPLCONF ...` - Replica registration and ACK configuration
+- `INFO [section]` - Server information (sections: server, replication)
+
+### Replication
+- `REPLCONF ...` - Replica configuration and ACK
 - `PSYNC ...` - Initial replication handshake
 - `WAIT numreplicas timeout` - Wait for replicas to acknowledge writes
-- `CONFIG GET parameter` - Get configuration
 
 ## Replication
 
 FlashDB supports a Redis-like replication flow for basic leader/follower setups:
 
-- master keeps a replication offset and tracks connected replicas
-- replicas connect with `PING`, `REPLCONF`, and `PSYNC`
-- the master emits a full resync frame and propagates writes to connected replicas
-- `WAIT` can block until enough replicas acknowledge the master offset
+- Master keeps a replication offset and tracks connected replicas
+- Replicas connect with `PING`, `REPLCONF`, and `PSYNC`
+- Master emits a full resync frame and propagates writes to connected replicas
+- `WAIT` blocks until enough replicas acknowledge the master offset
 
 ### Start a master
 ```bash
-go run ./cmd/server --port 6379
+go run . --port 6379
 ```
 
 ### Start a replica
 ```bash
-go run ./cmd/server --port 6380 --replicaof 127.0.0.1 6379
+go run . --port 6380 --replicaof 127.0.0.1 6379
 ```
 
 ### Validate replication flow
@@ -84,7 +87,7 @@ OK
 
 ### Using Go directly
 ```bash
-go build -o flashdb cmd/server/main.go
+go build -o flashdb .
 ./flashdb
 ```
 
@@ -109,32 +112,40 @@ OK
 
 ```
 flashdb/
+├── main.go                  # Entry point
 ├── cmd/
 │   └── server/
-│       └── main.go          # Entry point
+│       └── main.go          # Alternative entry point
 ├── internal/
 │   ├── commands/
-│   │   ├── general.go       # PING, ECHO, INFO
-│   │   ├── strings.go       # SET, GET, INCR
-│   │   ├── lists.go         # LPUSH, RPUSH, LPOP
+│   │   ├── general.go       # PING, ECHO, INFO, WAIT, REPLCONF, PSYNC
+│   │   ├── strings.go       # SET, GET, INCR, TYPE
+│   │   ├── lists.go         # LPUSH, RPUSH, LPOP, BLPOP, LRANGE, LLEN
 │   │   ├── streams.go       # XADD, XRANGE, XREAD
 │   │   └── transactions.go  # MULTI, EXEC, DISCARD
+│   ├── persistence/
+│   │   └── rdb.go           # Binary snapshot save/load
+│   ├── replication/
+│   │   └── replica.go       # Replica connection and sync logic
 │   ├── resp/
 │   │   └── resp.go          # RESP protocol parser
 │   ├── server/
 │   │   └── server.go        # TCP server & client handler
 │   ├── storage/
-│   │   └── storage.go       # In-memory data structures
+│   │   ├── database.go      # Thread-safe key-value store
+│   │   ├── storage.go       # Global state, streams, lists
+│   │   └── metrics.go       # Connection and command metrics
 │   └── utilities/
 │       └── utilities.go     # Helper functions
 ```
 
 ## Performance Features
 
-- **Non-blocking I/O:** Goroutine-per-connection model for concurrent client handling
-- **Lock Optimization:** Read-write mutex for concurrent read operations
-- **Memory Efficient:** Lazy expiration of TTL keys to reduce overhead
-- **Metrics Tracking:** Built-in monitoring for keys count and active connections
+- **Goroutine-per-connection:** Concurrent client handling with dedicated goroutines
+- **RWMutex optimization:** Read-write mutex allows concurrent reads
+- **Lazy + Active expiration:** TTL keys expired on access and via background sweep
+- **Atomic persistence:** Temp file + rename pattern prevents corruption
+- **Metrics logging:** Background task logs keys, clients, and commands every 10s
 
 ## Development
 
@@ -146,7 +157,7 @@ go test ./...
 go fmt ./...
 
 # Build binary
-go build -o flashdb cmd/server/main.go
+go build -o flashdb .
 ```
 
 ## License

@@ -23,6 +23,7 @@ func SETvalue(args []string, client *storage.Client) string {
 	if len(args) >= 5 {
 		switch strings.ToUpper(args[3]) {
 		case "EX":
+			// EX option specifies the expiration time in seconds
 			seconds, err := strconv.Atoi(args[4])
 			if err != nil {
 				return resp.Error("invalid expire time")
@@ -30,6 +31,7 @@ func SETvalue(args []string, client *storage.Client) string {
 			ttl = time.Duration(seconds) * time.Second
 			hasTTL = true
 		case "PX":
+			// PX option specifies the expiration time in milliseconds
 			ms, err := strconv.Atoi(args[4])
 			if err != nil {
 				return resp.Error("invalid expire time")

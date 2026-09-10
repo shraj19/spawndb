@@ -25,10 +25,11 @@ func HandleConnection(conn net.Conn) {
 
 	for {
 		args, err := resp.ParseRESP(reader)
+		if err == io.EOF {
+			return
+		}
+
 		if err != nil {
-			if err == io.EOF {
-				return
-			}
 			fmt.Println("Parse error:", err)
 			return
 		}
@@ -119,6 +120,7 @@ func StartServer() {
 		}
 	}
 	if replicaHost != "" && replicaPort != "" {
+		// Start replication in a separate goroutine so that it doesn't block the main server loop
 		go func() {
 			storage.Replication.Mu.Lock()
 			storage.Replication.Role = "slave"

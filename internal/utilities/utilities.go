@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-
 // CompareIDs compares two stream IDs in the format "timestamp-sequence"
 // Returns -1 if a < b, 1 if a > b, 0 if equal
 func CompareIDs(a, b string) int {
