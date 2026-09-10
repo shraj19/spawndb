@@ -93,6 +93,9 @@ func LRANGE(args []string, client *storage.Client) string {
 		return resp.Error("start or stop is not an integer")
 	}
 
+	storage.Mu.RLock()
+	defer storage.Mu.RUnlock()
+
 	val, ok := storage.Lists[key]
 	if !ok {
 		return resp.EmptyArray()
