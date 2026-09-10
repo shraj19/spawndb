@@ -171,9 +171,22 @@ storage/
 - Lazy expiry on Get, Set, Exists, IncrBy
 - Type registration via Registry.Acquire()
 - ForEach/Load for persistence layer
+- Snapshot-based TTL iteration (avoids O(n) lock acquisitions)
+
+**Step 4: lists.go (ListStore)**
+- Implements full ListStore interface
+- Waiters live inside the store (not global)
+- Type safety via Registry.Acquire() on writes
+- LRange returns copy to avoid exposing internal slice
+- BLPop with timeout, multi-key support, proper waiter cleanup
+
+**Step 4b: storage_test.go (21 tests)**
+- TTLManager: SetAndCheck, CheckAndDelete, Remaining
+- Registry: AcquireAndType, Release, ExpiredKeyReuse
+- StringStore: SetGet, SetWithTTL, ExpiredKey, WrongType, IncrBy, Delete
+- ListStore: PushAndRange, LLen, LPop, WrongType, BLPop (immediate, priority, blocking, multi-key, timeout)
 
 ### Remaining Steps
-- Step 4: lists.go (ListStore with waiters)
 - Step 5: streams.go (StreamStore with StreamWaiters)
 - Step 6: database.go (facade)
 - Step 7: migrate commands to use new stores
@@ -215,6 +228,24 @@ _(TODO: mine from commits)_
 **T:** Fix cross-store type collision to match Redis behavior.
 **A:** Added `Registry.Acquire()` that all stores call before write. Returns `ErrWrongType` if key exists with different type.
 **R:** Impossible to have type collision. Matches Redis: "WRONGTYPE Operation against a key holding the wrong kind of value"
+
+### Waiters Encapsulation (Sep 10)
+**S:** List waiters (for BLPOP) were global `map[string][]chan` in storage.go, separate from list data.
+**T:** Encapsulate waiters with their data following SRP — waiters are tightly coupled to list operations.
+**A:** Moved waiters inside `listStore` struct. LPUSH/RPUSH wake waiters before appending. BLPop registers waiter and blocks.
+**R:** Self-contained ListStore. No global state. Easier to test, mock, and reason about.
+
+### LRange Slice Safety (Sep 10)
+**S:** Original LRange returned slice of internal data — callers could mutate store's data.
+**T:** Prevent accidental mutation of internal state.
+**A:** LRange now returns `copy(result, list[start:stop+1])` instead of direct slice.
+**R:** Defensive copy. Internal data is never exposed. Small overhead, but worth it for safety.
+
+### BLPop Multi-Key Bug (Sep 10)
+**S:** BLPOP supports multiple keys (priority order) but original impl only registered waiter on first key.
+**T:** If user does `BLPOP high medium low 0` and `low` gets data first, should unblock.
+**A:** Register waiter channel on ALL keys. On wake or timeout, remove from ALL keys.
+**R:** Correct priority queue behavior. Test `TestListStore_BLPop_MultiKeyBlocking` verifies the fix.
 
 ---
 
