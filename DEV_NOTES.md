@@ -135,6 +135,52 @@ storage/
 
 ---
 
+## Storage Refactoring (In Progress)
+
+### Design Decisions Made
+
+**1. Type Registry + TTLManager (SRP)**
+- `TTLManager` — only tracks key → expiry
+- `TypeRegistry` — only tracks key → type, depends on TTLManager
+- Avoids coupling two responsibilities in one struct
+
+**2. Lazy Expiry (Memcached style)**
+- No background goroutine
+- Check and cleanup on every access
+- Less lock contention, simpler, embeddable
+
+**3. WRONGTYPE Enforcement**
+- Current bug: same key can exist in strings AND lists (separate maps)
+- Fix: Registry.Acquire() checks type before any operation
+- Matches Redis behavior
+
+### Completed Steps
+
+**Step 1: types.go + interfaces.go**
+- `DataType` enum (TypeString, TypeList, TypeStream)
+- Errors: `ErrWrongType`, `ErrNotFound`, `ErrNotInt`
+- Interfaces: `Registry`, `StringStore`, `ListStore`, `StreamStore`, `DataStore`
+
+**Step 2: ttl.go + registry.go**
+- `TTLManager` — Set, SetTTL, Get, IsExpired, CheckAndDelete, Remaining
+- `typeRegistry` — Acquire, Release, SetTTL, GetTTL, Type, Keys
+- Dependency injection: Registry depends on TTLManager
+
+**Step 3: strings.go (StringStore)**
+- Implements full StringStore interface
+- Lazy expiry on Get, Set, Exists, IncrBy
+- Type registration via Registry.Acquire()
+- ForEach/Load for persistence layer
+
+### Remaining Steps
+- Step 4: lists.go (ListStore with waiters)
+- Step 5: streams.go (StreamStore with StreamWaiters)
+- Step 6: database.go (facade)
+- Step 7: migrate commands to use new stores
+- Step 8: delete old globals
+
+---
+
 ## War Stories (STAR ammo)
 
 ### LRANGE Race Condition (Sep 9)
@@ -151,6 +197,24 @@ _(TODO: mine from commits)_
 **T:** Decouple commands from wire format for maintainability and correctness.
 **A:** Created `resp` helpers, refactored all handlers to use them.
 **R:** ~40% less code in handlers, single source of truth for encoding, easier to test commands in isolation.
+
+### TTL Design: Redis vs Memcached (Sep 10)
+**S:** Needed to decide TTL strategy — Redis uses lazy + active expiry, Memcached uses lazy only.
+**T:** Choose approach that fits multi-threaded design with per-store locks.
+**A:** Chose Memcached style (lazy only). No background goroutine competing for locks. Cleanup happens on access via `CheckAndDelete()`.
+**R:** Simpler code, less lock contention, easier to embed. Tradeoff: expired-but-unaccessed keys stay in memory until accessed or evicted.
+
+### SRP Violation Caught: Entry Struct (Sep 10)
+**S:** Initial design had `entry{typ, expiry}` combining type and TTL.
+**T:** Reviewer (self) flagged SRP violation — two responsibilities in one struct.
+**A:** Split into separate `TTLManager` and `TypeRegistry`. Registry depends on TTLManager via injection.
+**R:** Each component has single responsibility. Can modify TTL logic without touching type logic. Better testability.
+
+### WRONGTYPE Bug Discovery (Sep 10)
+**S:** Discovered same key could exist in both `Store` (strings) and `Lists` maps simultaneously.
+**T:** Fix cross-store type collision to match Redis behavior.
+**A:** Added `Registry.Acquire()` that all stores call before write. Returns `ErrWrongType` if key exists with different type.
+**R:** Impossible to have type collision. Matches Redis: "WRONGTYPE Operation against a key holding the wrong kind of value"
 
 ---
 
