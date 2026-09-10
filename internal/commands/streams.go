@@ -1,163 +1,157 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 	"github.com/shraj19/flashdb/internal/utilities"
 )
 
-func XADD(args []string, client *storage.Client) string {
-	// Checking length of args
-	if len(args) < 5 || len(args)%2 != 1 {
-		return "-ERR wrong number of arguments for 'xadd'\r\n"
+// --- Errors ---
+
+var (
+	errInvalidIDFormat = errors.New("invalid stream ID format")
+	errIDTooSmall      = errors.New("The ID specified in XADD is equal or smaller than the target stream top item")
+	errIDMustBeGreater = errors.New("The ID specified in XADD must be greater than 0-0")
+)
+
+// --- ID helpers ---
+
+// resolveStreamID resolves a stream entry ID from user input.
+// inputID can be:
+//   - "*" → auto-generate timestamp-sequence
+//   - "<ts>-*" → use given timestamp, auto-generate sequence
+//   - "<ts>-<seq>" → explicit ID (validated against lastID)
+func resolveStreamID(inputID string, lastID string) (string, error) {
+	if inputID == "*" {
+		ts := time.Now().UnixMilli()
+		if lastID == "" {
+			return fmt.Sprintf("%d-0", ts), nil
+		}
+		lastTs, lastSeq := parseID(lastID)
+		if ts > lastTs {
+			return fmt.Sprintf("%d-0", ts), nil
+		}
+		return fmt.Sprintf("%d-%d", lastTs, lastSeq+1), nil
 	}
 
-	// Checking for key and id
-	streamKey := args[1]
-	id := args[2]
+	if strings.HasSuffix(inputID, "-*") {
+		tsStr := strings.TrimSuffix(inputID, "-*")
+		ts, err := strconv.ParseInt(tsStr, 10, 64)
+		if err != nil || ts < 0 {
+			return "", errInvalidIDFormat
+		}
 
-	// Locking the storage for safe concurrent access
-	storage.Mu.Lock()
-	defer storage.Mu.Unlock()
+		if lastID == "" {
+			if ts == 0 {
+				return "0-1", nil
+			}
+			return fmt.Sprintf("%d-0", ts), nil
+		}
 
-	// Retrieving or initializing the stream
-	streams := *storage.GetStreams()
-	stream, exists := streams[streamKey]
+		lastTs, lastSeq := parseID(lastID)
+		if ts < lastTs {
+			return "", errIDTooSmall
+		}
+		if ts == lastTs {
+			return fmt.Sprintf("%d-%d", ts, lastSeq+1), nil
+		}
+		return fmt.Sprintf("%d-0", ts), nil
+	}
+
+	// Explicit ID
+	parts := strings.Split(inputID, "-")
+	if len(parts) != 2 {
+		return "", errInvalidIDFormat
+	}
+	ts, err1 := strconv.ParseInt(parts[0], 10, 64)
+	seq, err2 := strconv.ParseInt(parts[1], 10, 64)
+	if err1 != nil || err2 != nil || ts < 0 || seq < 0 {
+		return "", errInvalidIDFormat
+	}
+
+	if ts == 0 && seq == 0 {
+		return "", errIDMustBeGreater
+	}
+
+	if lastID != "" && utilities.CompareIDs(inputID, lastID) <= 0 {
+		return "", errIDTooSmall
+	}
+
+	return inputID, nil
+}
+
+// parseID extracts timestamp and sequence from a valid ID string.
+func parseID(id string) (ts int64, seq int64) {
+	parts := strings.Split(id, "-")
+	ts, _ = strconv.ParseInt(parts[0], 10, 64)
+	seq, _ = strconv.ParseInt(parts[1], 10, 64)
+	return
+}
+
+// --- Stream helpers ---
+
+// getOrCreateStream returns the stream for key, creating if needed.
+// Caller must hold storage.Mu lock.
+func getOrCreateStream(streams map[string]*storage.Stream, key string) (*storage.Stream, bool) {
+	stream, exists := streams[key]
 	if !exists {
 		stream = &storage.Stream{
 			Entries: []storage.StreamEntry{},
 			Index:   make(map[string]int),
 		}
+		streams[key] = stream
 	}
-
-	// ---- ID Generation ----
-	if id == "*" {
-		ts := time.Now().UnixMilli()
-		// first entry: sequence 0
-		id = fmt.Sprintf("%d-0", ts)
-	} else if strings.HasSuffix(id, "-*") {
-		parts := strings.Split(id, "-")
-		ts, err := strconv.ParseInt(parts[0], 10, 64)
-		if err != nil || ts < 0 {
-			return "-ERR invalid stream ID format\r\n"
-		}
-
-		if exists && len(stream.Entries) > 0 {
-			lastID := stream.Entries[len(stream.Entries)-1].ID
-			lastParts := strings.Split(lastID, "-")
-			lastTs, _ := strconv.ParseInt(lastParts[0], 10, 64)
-			lastSeq, _ := strconv.ParseInt(lastParts[1], 10, 64)
-
-			if ts < lastTs {
-				return "-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n"
-			}
-			if ts == lastTs {
-				id = fmt.Sprintf("%d-%d", ts, lastSeq+1)
-			} else {
-				id = fmt.Sprintf("%d-0", ts)
-			}
-		} else {
-			// first entry in stream
-			if ts == 0 {
-				id = "0-1" // never 0-0
-			} else {
-				id = fmt.Sprintf("%d-0", ts)
-			}
-		}
-	}
-
-	// ---- Validate explicit ID ----
-	parts := strings.Split(id, "-")
-	if len(parts) != 2 {
-		return "-ERR invalid stream ID format\r\n"
-	}
-	ts, err1 := strconv.ParseInt(parts[0], 10, 64)
-	seq, err2 := strconv.ParseInt(parts[1], 10, 64)
-	if err1 != nil || err2 != nil || ts < 0 || seq < 0 {
-		return "-ERR invalid stream ID format\r\n"
-	}
-
-	// Special case: 0-0 is invalid
-	if ts == 0 && seq == 0 {
-		return "-ERR The ID specified in XADD must be greater than 0-0\r\n"
-	}
-
-	if exists && len(stream.Entries) > 0 {
-		lastID := stream.Entries[len(stream.Entries)-1].ID
-		if utilities.CompareIDs(id, lastID) <= 0 {
-			return "-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n"
-		}
-	}
-
-	// ---- Add entry ----
-	entry := storage.StreamEntry{
-		ID:     id,
-		Fields: make(map[string]string),
-	}
-	for i := 3; i < len(args); i += 2 {
-		entry.Fields[args[i]] = args[i+1]
-	}
-
-	stream.Entries = append(stream.Entries, entry)
-	stream.Index[id] = len(stream.Entries) - 1
-
-	if !exists {
-		streams[streamKey] = stream
-	}
-
-	// ---- Notify waiters ----
-	if waiters, ok := storage.StreamWaiters[streamKey]; ok {
-		newID := id
-		var remaining []*storage.StreamWaiter
-		for _, w := range waiters {
-			lastID := w.StreamIDs[streamKey]
-			if utilities.CompareIDs(newID, lastID) > 0 {
-				close(w.Done)
-			} else {
-				remaining = append(remaining, w)
-			}
-		}
-		if len(remaining) == 0 {
-			delete(storage.StreamWaiters, streamKey)
-		} else {
-			storage.StreamWaiters[streamKey] = remaining
-		}
-	}
-
-
-	return fmt.Sprintf("$%d\r\n%s\r\n", len(id), id)
+	return stream, exists
 }
 
-func XRANGE(args []string, client *storage.Client) string {
-	if len(args) != 4 {
-		return "-ERR wrong number of arguments for 'xrange'\r\n"
+// getLastID returns the last entry ID or empty string.
+func getLastID(stream *storage.Stream) string {
+	if len(stream.Entries) > 0 {
+		return stream.Entries[len(stream.Entries)-1].ID
+	}
+	return ""
+}
+
+// --- Encoding helpers ---
+
+func encodeStreamEntry(b *strings.Builder, entry storage.StreamEntry) {
+	b.WriteString("*2\r\n")
+	b.WriteString(resp.BulkString(entry.ID))
+	fmt.Fprintf(b, "*%d\r\n", len(entry.Fields)*2)
+	for k, v := range entry.Fields {
+		b.WriteString(resp.BulkString(k))
+		b.WriteString(resp.BulkString(v))
+	}
+}
+
+func encodeStreamEntries(b *strings.Builder, entries []storage.StreamEntry) {
+	fmt.Fprintf(b, "*%d\r\n", len(entries))
+	for _, entry := range entries {
+		encodeStreamEntry(b, entry)
+	}
+}
+
+func encodeStreamResult(b *strings.Builder, streamKey string, entries []storage.StreamEntry) {
+	b.WriteString("*2\r\n")
+	b.WriteString(resp.BulkString(streamKey))
+	encodeStreamEntries(b, entries)
+}
+
+// --- Search helpers ---
+
+func searchEntryRange(entries []storage.StreamEntry, startID, endID string) (int, int) {
+	n := len(entries)
+	if n == 0 {
+		return -1, -1
 	}
 
-	streamkey, startID, endID := args[1], args[2], args[3]
-
-	storage.Mu.RLock()
-	defer storage.Mu.RUnlock()
-
-	streamsMap := *storage.GetStreams()
-	stream, ok := streamsMap[streamkey]
-	if !ok || len(stream.Entries) == 0 {
-		return "*0\r\n"
-	}
-
-	entries := stream.Entries
-	if startID == "-" {
-		startID = entries[0].ID
-	}
-	if endID == "+" {
-		endID = entries[len(entries)-1].ID
-	}
-
-	// Binary search
-	lo, hi := 0, len(entries)
+	lo, hi := 0, n
 	for lo < hi {
 		mid := (lo + hi) / 2
 		if utilities.CompareIDs(entries[mid].ID, startID) < 0 {
@@ -168,7 +162,7 @@ func XRANGE(args []string, client *storage.Client) string {
 	}
 	startIdx := lo
 
-	lo, hi = 0, len(entries)
+	lo, hi = 0, n
 	for lo < hi {
 		mid := (lo + hi) / 2
 		if utilities.CompareIDs(entries[mid].ID, endID) <= 0 {
@@ -179,185 +173,308 @@ func XRANGE(args []string, client *storage.Client) string {
 	}
 	endIdx := lo - 1
 
-	if startIdx > endIdx {
-		return "*0\r\n"
+	if startIdx > endIdx || startIdx >= n {
+		return -1, -1
 	}
-
-	count := endIdx - startIdx + 1
-	var respBuilder strings.Builder
-	respBuilder.WriteString(fmt.Sprintf("*%d\r\n", count))
-	for i := startIdx; i <= endIdx; i++ {
-		entry := entries[i]
-		respBuilder.WriteString(fmt.Sprintf("*2\r\n$%d\r\n%s\r\n*%d\r\n", len(entry.ID), entry.ID, len(entry.Fields)*2))
-		for k, v := range entry.Fields {
-			respBuilder.WriteString(fmt.Sprintf("$%d\r\n%s\r\n$%d\r\n%s\r\n", len(k), k, len(v), v))
-		}
-	}
-	return respBuilder.String()
+	return startIdx, endIdx
 }
 
-func XREAD(args []string, client *storage.Client) string {
-	//  Checking length of args
-	if len(args) < 4 {
-		return "-ERR wrong number of arguments for 'xread'\r\n"
+func searchEntryAfter(entries []storage.StreamEntry, targetID string) int {
+	lo, hi := 0, len(entries)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if utilities.CompareIDs(entries[mid].ID, targetID) <= 0 {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	return lo
+}
+
+// --- Waiter helpers ---
+
+// notifyWaiters wakes up waiters for streamKey if newID > their lastID.
+// Caller must hold storage.Mu lock.
+func notifyWaiters(streamKey, newID string) {
+	waiters, ok := storage.StreamWaiters[streamKey]
+	if !ok {
+		return
 	}
 
-	blocktime := -1 // default: no blocking (i.e., return immediately)
+	var remaining []*storage.StreamWaiter
+	for _, w := range waiters {
+		if utilities.CompareIDs(newID, w.StreamIDs[streamKey]) > 0 {
+			close(w.Done)
+		} else {
+			remaining = append(remaining, w)
+		}
+	}
+
+	if len(remaining) == 0 {
+		delete(storage.StreamWaiters, streamKey)
+	} else {
+		storage.StreamWaiters[streamKey] = remaining
+	}
+}
+
+// unregisterWaiter removes waiter from all streamKeys.
+// Caller must hold storage.Mu lock.
+func unregisterWaiter(waiter *storage.StreamWaiter, streamKeys []string) {
+	for _, key := range streamKeys {
+		waiters := storage.StreamWaiters[key]
+		for i, w := range waiters {
+			if w == waiter {
+				storage.StreamWaiters[key] = append(waiters[:i], waiters[i+1:]...)
+				break
+			}
+		}
+		if len(storage.StreamWaiters[key]) == 0 {
+			delete(storage.StreamWaiters, key)
+		}
+	}
+}
+
+// --- XREAD parsing and query ---
+
+type xreadArgs struct {
+	blockTime  int // -1 = no block, 0 = infinite, >0 = milliseconds
+	streamKeys []string
+	streamIDs  []string
+}
+
+func parseXREADArgs(args []string) (*xreadArgs, error) {
+	if len(args) < 4 {
+		return nil, errors.New("wrong number of arguments for 'xread'")
+	}
+
+	result := &xreadArgs{blockTime: -1}
 	streamsIdx := -1
+
 	for i := 1; i < len(args); i++ {
-		if strings.ToUpper(args[i]) == "BLOCK" && i+1 < len(args) {
+		switch strings.ToUpper(args[i]) {
+		case "BLOCK":
+			if i+1 >= len(args) {
+				return nil, errors.New("invalid BLOCK time")
+			}
 			bt, err := strconv.Atoi(args[i+1])
 			if err != nil || bt < 0 {
-				return "-ERR invalid BLOCK time\r\n"
+				return nil, errors.New("invalid BLOCK time")
 			}
-			blocktime = bt
+			result.blockTime = bt
 			i++
-		} else if strings.ToUpper(args[i]) == "STREAMS" {
+		case "STREAMS":
 			streamsIdx = i
+		}
+		if streamsIdx != -1 {
 			break
 		}
 	}
+
 	if streamsIdx == -1 {
-		return "-ERR syntax error\r\n"
+		return nil, errors.New("STREAMS keyword not found")
 	}
 
-	// Getting stream keys and IDs
 	start := streamsIdx + 1
-	numKeys := (len(args) - start) / 2
-	streamKeys := args[start : start+numKeys]
-	streamIDs := args[start+numKeys:]
-	
-	// Locking the storage for safe concurrent access
-	storage.Mu.Lock()
-	streamsMap := *storage.GetStreams()
+	remaining := len(args) - start
+	if remaining == 0 || remaining%2 != 0 {
+		return nil, errors.New("wrong number of arguments for 'xread'")
+	}
 
-	// Replace "$" with actual last IDs
+	numKeys := remaining / 2
+	result.streamKeys = args[start : start+numKeys]
+	result.streamIDs = make([]string, numKeys)
+	copy(result.streamIDs, args[start+numKeys:])
+
+	return result, nil
+}
+
+// resolveDollarIDs replaces "$" with actual last IDs.
+// Caller must hold storage.Mu lock.
+func resolveDollarIDs(streamKeys, streamIDs []string, streams map[string]*storage.Stream) {
 	for i, key := range streamKeys {
 		if streamIDs[i] == "$" {
-			if stream, ok := streamsMap[key]; ok && len(stream.Entries) > 0 {
+			if stream, ok := streams[key]; ok && len(stream.Entries) > 0 {
 				streamIDs[i] = stream.Entries[len(stream.Entries)-1].ID
 			} else {
 				streamIDs[i] = "0-0"
 			}
 		}
 	}
+}
 
-	var responses []string
+type streamQueryResult struct {
+	key     string
+	entries []storage.StreamEntry
+}
+
+// queryStreams fetches entries after given IDs for each stream.
+// Returns results and whether any stream has entries.
+// Caller must hold storage.Mu lock.
+func queryStreams(streamKeys, streamIDs []string, streams map[string]*storage.Stream) ([]streamQueryResult, bool) {
+	results := make([]streamQueryResult, len(streamKeys))
 	hasEntry := false
 
-	for i, streamKey := range streamKeys {
-		startID := streamIDs[i]
-		stream, ok := streamsMap[streamKey]
-		var streamResp strings.Builder
-
-		if !ok || len(stream.Entries) == 0 {
-			responses = append(responses, fmt.Sprintf("*2\r\n$%d\r\n%s\r\n*0\r\n", len(streamKey), streamKey))
-			continue
-		}
-
-		entries := stream.Entries
-		lo, hi := 0, len(entries)
-		for lo < hi {
-			mid := (lo + hi) / 2
-			if utilities.CompareIDs(entries[mid].ID, startID) <= 0 {
-				lo = mid + 1
-			} else {
-				hi = mid
-			}
-		}
-		startIdx := lo
-
-		if startIdx >= len(entries) {
-			responses = append(responses, fmt.Sprintf("*2\r\n$%d\r\n%s\r\n*0\r\n", len(streamKey), streamKey))
-			continue
-		}
-
-		hasEntry = true
-		entryCount := len(entries) - startIdx
-		streamResp.WriteString(fmt.Sprintf("*2\r\n$%d\r\n%s\r\n*%d\r\n", len(streamKey), streamKey, entryCount))
-		for j := startIdx; j < len(entries); j++ {
-			e := entries[j]
-			streamResp.WriteString(fmt.Sprintf("*2\r\n$%d\r\n%s\r\n*%d\r\n", len(e.ID), e.ID, len(e.Fields)*2))
-			for k, v := range e.Fields {
-				streamResp.WriteString(fmt.Sprintf("$%d\r\n%s\r\n$%d\r\n%s\r\n", len(k), k, len(v), v))
-			}
-		}
-		responses = append(responses, streamResp.String())
-	}
-
-	if hasEntry || blocktime < 0 {
-		var final strings.Builder
-		final.WriteString(fmt.Sprintf("*%d\r\n", len(responses)))
-		for _, r := range responses {
-			final.WriteString(r)
-		}
-		storage.Mu.Unlock()
-		return final.String()
-	}
-
-	// No new entries → block
-	waiter := &storage.StreamWaiter{
-		Conn: client.Conn,
-		Done: make(chan struct{}),
-		StreamIDs: map[string]string{},
-	}
 	for i, key := range streamKeys {
-		waiter.StreamIDs[key] = streamIDs[i]
+		results[i].key = key
+
+		stream, ok := streams[key]
+		if !ok || len(stream.Entries) == 0 {
+			continue
+		}
+
+		startIdx := searchEntryAfter(stream.Entries, streamIDs[i])
+		if startIdx < len(stream.Entries) {
+			results[i].entries = stream.Entries[startIdx:]
+			hasEntry = true
+		}
+	}
+
+	return results, hasEntry
+}
+
+// encodeXREADResponse encodes query results as RESP.
+func encodeXREADResponse(results []streamQueryResult) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "*%d\r\n", len(results))
+	for _, r := range results {
+		encodeStreamResult(&b, r.key, r.entries)
+	}
+	return b.String()
+}
+
+// --- Commands ---
+
+func XADD(args []string, client *storage.Client) string {
+	if len(args) < 5 || len(args)%2 != 1 {
+		return resp.Error("wrong number of arguments for 'xadd'")
+	}
+
+	streamKey := args[1]
+	inputID := args[2]
+
+	storage.Mu.Lock()
+	defer storage.Mu.Unlock()
+
+	streams := *storage.GetStreams()
+	stream, _ := getOrCreateStream(streams, streamKey)
+	lastID := getLastID(stream)
+
+	id, err := resolveStreamID(inputID, lastID)
+	if err != nil {
+		return resp.Error(err.Error())
+	}
+
+	// Build entry
+	entry := storage.StreamEntry{
+		ID:     id,
+		Fields: make(map[string]string),
+	}
+	for i := 3; i < len(args); i += 2 {
+		entry.Fields[args[i]] = args[i+1]
+	}
+
+	// Add to stream
+	stream.Entries = append(stream.Entries, entry)
+	stream.Index[id] = len(stream.Entries) - 1
+
+	// Notify blocked readers
+	notifyWaiters(streamKey, id)
+
+	return resp.BulkString(id)
+}
+
+func XRANGE(args []string, client *storage.Client) string {
+	if len(args) != 4 {
+		return resp.Error("wrong number of arguments for 'xrange'")
+	}
+
+	streamKey, startID, endID := args[1], args[2], args[3]
+
+	storage.Mu.RLock()
+	defer storage.Mu.RUnlock()
+
+	streams := *storage.GetStreams()
+	stream, ok := streams[streamKey]
+	if !ok || len(stream.Entries) == 0 {
+		return resp.EmptyArray()
+	}
+
+	entries := stream.Entries
+	if startID == "-" {
+		startID = entries[0].ID
+	}
+	if endID == "+" {
+		endID = entries[len(entries)-1].ID
+	}
+
+	startIdx, endIdx := searchEntryRange(entries, startID, endID)
+	if startIdx == -1 {
+		return resp.EmptyArray()
+	}
+
+	var b strings.Builder
+	encodeStreamEntries(&b, entries[startIdx:endIdx+1])
+	return b.String()
+}
+
+func XREAD(args []string, client *storage.Client) string {
+	parsed, err := parseXREADArgs(args)
+	if err != nil {
+		return resp.Error(err.Error())
+	}
+
+	storage.Mu.Lock()
+	streams := *storage.GetStreams()
+
+	resolveDollarIDs(parsed.streamKeys, parsed.streamIDs, streams)
+	results, hasEntry := queryStreams(parsed.streamKeys, parsed.streamIDs, streams)
+
+	// Return immediately if we have entries or not blocking
+	if hasEntry || parsed.blockTime < 0 {
+		storage.Mu.Unlock()
+		return encodeXREADResponse(results)
+	}
+
+	// Block for new entries
+	waiter := &storage.StreamWaiter{
+		Conn:      client.Conn,
+		Done:      make(chan struct{}),
+		StreamIDs: make(map[string]string),
+	}
+	for i, key := range parsed.streamKeys {
+		waiter.StreamIDs[key] = parsed.streamIDs[i]
 		storage.StreamWaiters[key] = append(storage.StreamWaiters[key], waiter)
 	}
 	storage.Mu.Unlock()
 
+	// Wait for notification or timeout
 	var timeout <-chan time.Time
-	if blocktime > 0 {
-		timeout = time.After(time.Duration(blocktime) * time.Millisecond)
+	if parsed.blockTime > 0 {
+		timeout = time.After(time.Duration(parsed.blockTime) * time.Millisecond)
 	}
 
 	select {
 	case <-waiter.Done:
-		// cleanup first
 		storage.Mu.Lock()
-		for _, key := range streamKeys {
-			waiters := storage.StreamWaiters[key]
-			for i, w := range waiters {
-				if w == waiter {
-					storage.StreamWaiters[key] = append(waiters[:i], waiters[i+1:]...)
-					break
-				}
-			}
-		}
+		unregisterWaiter(waiter, parsed.streamKeys)
 		storage.Mu.Unlock()
 
-		// Resolve '$' to last known IDs before re-invocation
+		// Re-query with resolved IDs
 		storage.Mu.RLock()
-		for i, key := range streamKeys {
-			if streamIDs[i] == "$" {
-				if s, ok := (*storage.GetStreams())[key]; ok && len(s.Entries) > 0 {
-					streamIDs[i] = s.Entries[len(s.Entries)-1].ID
-				} else {
-					streamIDs[i] = "0-0"
-				}
-			}
-		}
+		streams := *storage.GetStreams()
+		results, _ := queryStreams(parsed.streamKeys, parsed.streamIDs, streams)
 		storage.Mu.RUnlock()
 
-		// Now re-run with resolved IDs
-		newArgs := make([]string, len(args))
-		copy(newArgs, args) // This recursive call is tricky.
-		client.Conn.Write([]byte(XREAD(newArgs, client)))
+		client.Conn.Write([]byte(encodeXREADResponse(results)))
 
 	case <-timeout:
 		storage.Mu.Lock()
-		for _, key := range streamKeys {
-			waiters := storage.StreamWaiters[key]
-			for i, w := range waiters {
-				if w == waiter {
-					storage.StreamWaiters[key] = append(waiters[:i], waiters[i+1:]...)
-					break
-				}
-			}
-		}
+		unregisterWaiter(waiter, parsed.streamKeys)
 		storage.Mu.Unlock()
-		client.Conn.Write([]byte("*-1\r\n"))
+
+		client.Conn.Write([]byte(resp.NullArray()))
 	}
-	return "" // Response is sent asynchronously
+
+	return ""
 }
