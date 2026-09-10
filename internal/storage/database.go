@@ -3,6 +3,7 @@ package storage
 import (
 	"sync"
 	"time"
+	"strconv"
 )
 
 // Database encapsulates all data storage for FlashDB.
@@ -107,6 +108,27 @@ func (db *Database) Keys() []string {
 	return keys
 }
 
+func (db *Database) INCRby(key string, delta int64) (int64, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if db.isExpired(key) {
+		db.store[key] = "0"
+	}
+
+	val, ok := db.store[key]
+	if !ok {
+		db.store[key] = "0"
+		val = "0"
+	}
+	num, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	num += delta
+	db.store[key] = strconv.FormatInt(num, 10)
+	return num, nil
+}
 // --- TTL operations ---
 
 // TTLResult holds TTL query result.
