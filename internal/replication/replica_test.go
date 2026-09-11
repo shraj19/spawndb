@@ -8,29 +8,56 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/commands"
+	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 )
 
+// TestStartReplicaAppliesPropagatedSET tests that replicated SET commands
+// are applied to the local DataStore.
+//
+// Note: This test creates minimal command handlers inline to avoid importing
+// the commands package (which would create an import cycle).
 func TestStartReplicaAppliesPropagatedSET(t *testing.T) {
 	// Reset replication state
-	storage.Replication = &storage.ReplicationState{
+	State = &ReplicationState{
 		Role:     "master",
 		ReplID:   "test-repl-id",
 		Offset:   0,
-		Replicas: make(map[string]*storage.ReplicaConnection),
+		Replicas: make(map[string]*ReplicaConnection),
 	}
 	
-	// Create DataStore and initialize commands with factories
+	// Create DataStore
 	db := storage.NewDataStore()
-	storage.InitCommands(map[string]storage.CommandHandler{
-		"PING":     commands.PING,
-		"SET":      commands.MakeSET(db),
-		"GET":      commands.MakeGET(db),
-		"REPLCONF": commands.REPLCONF,
-		"PSYNC":    commands.PSYNC,
-		"WAIT":     commands.WAIT,
+	
+	// Create minimal handlers inline (avoids import cycle)
+	core.InitCommands(map[string]core.CommandHandler{
+		"PING": func(args []string, client *core.Client) string {
+			return "+PONG\r\n"
+		},
+		"SET": func(args []string, client *core.Client) string {
+			if len(args) < 3 {
+				return "-ERR wrong number of arguments\r\n"
+			}
+			db.Strings().Set(args[1], args[2])
+			return "+OK\r\n"
+		},
+		"GET": func(args []string, client *core.Client) string {
+			if len(args) < 2 {
+				return "-ERR wrong number of arguments\r\n"
+			}
+			val, ok := db.Strings().Get(args[1])
+			if !ok {
+				return "$-1\r\n"
+			}
+			return resp.BulkString(val)
+		},
+		"REPLCONF": func(args []string, client *core.Client) string {
+			return "+OK\r\n"
+		},
+		"PSYNC": func(args []string, client *core.Client) string {
+			return ""
+		},
 	})
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -87,7 +114,6 @@ func TestStartReplicaAppliesPropagatedSET(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		// Check the DataStore, not the legacy DB
 		v, ok := db.Strings().Get("replicated")
 		if ok && v == "value" {
 			return

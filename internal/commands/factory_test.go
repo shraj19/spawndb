@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 )
@@ -419,7 +420,7 @@ func TestMakeBLPOP_Immediate(t *testing.T) {
 	rpush([]string{"RPUSH", "list", "value"}, nil)
 
 	conn := &mockConn{}
-	client := &storage.Client{Conn: conn}
+	client := &core.Client{Conn: conn}
 
 	result := blpop([]string{"BLPOP", "list", "1"}, client)
 
@@ -440,7 +441,7 @@ func TestMakeBLPOP_Timeout(t *testing.T) {
 	blpop := MakeBLPOP(db)
 
 	conn := &mockConn{}
-	client := &storage.Client{Conn: conn}
+	client := &core.Client{Conn: conn}
 
 	start := time.Now()
 	result := blpop([]string{"BLPOP", "empty", "0.1"}, client)
@@ -467,7 +468,7 @@ func TestMakeBLPOP_BlockThenPush(t *testing.T) {
 	blpop := MakeBLPOP(db)
 
 	conn := &mockConn{}
-	client := &storage.Client{Conn: conn}
+	client := &core.Client{Conn: conn}
 
 	// Start blocking pop in goroutine
 	done := make(chan struct{})

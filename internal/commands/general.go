@@ -6,17 +6,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/core"
+	"github.com/shraj19/flashdb/internal/replication"
 	"github.com/shraj19/flashdb/internal/resp"
-	"github.com/shraj19/flashdb/internal/storage"
 )
 
 // PING command
-func PING(args []string, client *storage.Client) string {
+func PING(args []string, client *core.Client) string {
 	return resp.PONG()
 }
 
 // ECHO command
-func ECHO(args []string, client *storage.Client) string {
+func ECHO(args []string, client *core.Client) string {
 	if len(args) < 2 {
 		return resp.Error("wrong number of arguments for 'echo'")
 	}
@@ -24,7 +25,7 @@ func ECHO(args []string, client *storage.Client) string {
 }
 
 // INFO command
-func INFO(args []string, client *storage.Client) string {
+func INFO(args []string, client *core.Client) string {
 	section := "default" // section is default if not specified
 	if len(args) > 1 {
 		section = args[1]
@@ -51,12 +52,12 @@ func buildServerInfo() string {
 	return info
 }
 
-func WAIT(args []string, client *storage.Client) string {
+func WAIT(args []string, client *core.Client) string {
 	if len(args) < 3 {
 		return resp.Error("wrong number of arguments for 'wait'")
 	}
 
-	replication := storage.EnsureReplication()
+	repl := replication.EnsureState()
 
 	numReplicas, err := strconv.Atoi(args[1])
 	if err != nil {
@@ -67,18 +68,18 @@ func WAIT(args []string, client *storage.Client) string {
 		return resp.Error("invalid timeout")
 	}
 
-	replication.Mu.RLock()
-	targetOffset := replication.Offset
-	replication.Mu.RUnlock()
+	repl.Mu.RLock()
+	targetOffset := repl.Offset
+	repl.Mu.RUnlock()
 
-	replication.Mu.RLock()
+	repl.Mu.RLock()
 	connected := 0
-	for _, r := range replication.Replicas {
+	for _, r := range repl.Replicas {
 		if r != nil && r.Connected {
 			connected++
 		}
 	}
-	replication.Mu.RUnlock()
+	repl.Mu.RUnlock()
 	if connected == 0 {
 		return resp.Integer(0)
 	}
@@ -87,21 +88,21 @@ func WAIT(args []string, client *storage.Client) string {
 		return resp.Integer(int64(connected))
 	}
 
-	replication.Mu.RLock()
-	lastAsked := replication.LastAskedOffset
-	replication.Mu.RUnlock()
+	repl.Mu.RLock()
+	lastAsked := repl.LastAskedOffset
+	repl.Mu.RUnlock()
 
 	if targetOffset > lastAsked {
 		time.Sleep(10 * time.Millisecond)
 		if b, err := resp.EncodeCommand([]string{"REPLCONF", "GETACK", "*"}); err == nil {
-			replication.Mu.RLock()
-			conns := make([]*storage.ReplicaConnection, 0, len(replication.Replicas))
-			for _, r := range replication.Replicas {
+			repl.Mu.RLock()
+			conns := make([]*replication.ReplicaConnection, 0, len(repl.Replicas))
+			for _, r := range repl.Replicas {
 				if r != nil && r.Connected && r.Conn != nil {
 					conns = append(conns, r)
 				}
 			}
-			replication.Mu.RUnlock()
+			repl.Mu.RUnlock()
 			for _, rc := range conns {
 				if rc.Conn != nil {
 					_, _ = rc.Conn.Write(b)
@@ -109,14 +110,14 @@ func WAIT(args []string, client *storage.Client) string {
 			}
 		}
 
-		replication.Mu.Lock()
-		replication.LastAskedOffset = targetOffset
-		replication.Mu.Unlock()
+		repl.Mu.Lock()
+		repl.LastAskedOffset = targetOffset
+		repl.Mu.Unlock()
 	}
 
 	deadline := time.Now().Add(time.Duration(timeoutMs) * time.Millisecond)
 	for {
-		acked := replication.CountReplicasAcked(targetOffset)
+		acked := repl.CountReplicasAcked(targetOffset)
 		if acked >= numReplicas {
 			return resp.Integer(int64(acked))
 		}
@@ -128,44 +129,44 @@ func WAIT(args []string, client *storage.Client) string {
 }
 
 func buildReplicationInfo() string {
-	replication := storage.EnsureReplication()
-	replication.Mu.RLock()
-	replid := replication.ReplID
-	offset := replication.Offset
+	repl := replication.EnsureState()
+	repl.Mu.RLock()
+	replid := repl.ReplID
+	offset := repl.Offset
 	connected := 0
-	for _, r := range replication.Replicas {
+	for _, r := range repl.Replicas {
 		if r != nil && r.Connected {
 			connected++
 		}
 	}
-	replication.Mu.RUnlock()
+	repl.Mu.RUnlock()
 
 	if replid == "" {
-		replication.Mu.Lock()
-		if replication.ReplID == "" {
-			replication.ReplID = fmt.Sprintf("%x", time.Now().UnixNano())
+		repl.Mu.Lock()
+		if repl.ReplID == "" {
+			repl.ReplID = fmt.Sprintf("%x", time.Now().UnixNano())
 		}
-		replid = replication.ReplID
-		replication.Mu.Unlock()
+		replid = repl.ReplID
+		repl.Mu.Unlock()
 	}
 
 	info := "# Replication\r\n"
-	info += fmt.Sprintf("role:%s\r\n", replication.Role)
+	info += fmt.Sprintf("role:%s\r\n", repl.Role)
 	info += fmt.Sprintf("connected_slaves:%d\r\n", connected)
 	info += fmt.Sprintf("master_replid:%s\r\n", replid)
 	info += fmt.Sprintf("master_repl_offset:%d\r\n", offset)
 	return info
 }
 
-func REPLCONF(args []string, client *storage.Client) string {
-	replication := storage.EnsureReplication()
+func REPLCONF(args []string, client *core.Client) string {
+	repl := replication.EnsureState()
 	if client != nil && client.Conn != nil {
 		addr := client.Conn.RemoteAddr().String()
-		replication.Mu.Lock()
-		rep, ok := replication.Replicas[addr]
+		repl.Mu.Lock()
+		rep, ok := repl.Replicas[addr]
 		if !ok {
-			rep = &storage.ReplicaConnection{Conn: client.Conn, Connected: true}
-			replication.Replicas[addr] = rep
+			rep = &replication.ReplicaConnection{Conn: client.Conn, Connected: true}
+			repl.Replicas[addr] = rep
 		} else {
 			rep.Conn = client.Conn
 			rep.Connected = true
@@ -187,7 +188,7 @@ func REPLCONF(args []string, client *storage.Client) string {
 				returnOK = false
 			}
 		}
-		replication.Mu.Unlock()
+		repl.Mu.Unlock()
 		if returnOK {
 			return resp.OK()
 		}
@@ -195,18 +196,18 @@ func REPLCONF(args []string, client *storage.Client) string {
 	return ""
 }
 
-func PSYNC(args []string, client *storage.Client) string {
-	replication := storage.EnsureReplication()
-	replication.Mu.RLock()
-	replid := replication.ReplID
-	replication.Mu.RUnlock()
+func PSYNC(args []string, client *core.Client) string {
+	repl := replication.EnsureState()
+	repl.Mu.RLock()
+	replid := repl.ReplID
+	repl.Mu.RUnlock()
 	if replid == "" {
-		replication.Mu.Lock()
-		if replication.ReplID == "" {
-			replication.ReplID = fmt.Sprintf("%x", time.Now().UnixNano())
+		repl.Mu.Lock()
+		if repl.ReplID == "" {
+			repl.ReplID = fmt.Sprintf("%x", time.Now().UnixNano())
 		}
-		replid = replication.ReplID
-		replication.Mu.Unlock()
+		replid = repl.ReplID
+		repl.Mu.Unlock()
 	}
 
 	if client != nil && client.Conn != nil {

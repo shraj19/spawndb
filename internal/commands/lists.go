@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 )
@@ -11,8 +12,8 @@ import (
 // --- List command factories (use DataStore) ---
 
 // MakeRPUSH creates an RPUSH command handler with injected DataStore.
-func MakeRPUSH(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeRPUSH(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 3 {
 			return resp.Error("wrong number of arguments for 'rpush'")
 		}
@@ -33,8 +34,8 @@ func MakeRPUSH(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeLPUSH creates an LPUSH command handler with injected DataStore.
-func MakeLPUSH(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeLPUSH(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 3 {
 			return resp.Error("wrong number of arguments for 'lpush'")
 		}
@@ -55,8 +56,8 @@ func MakeLPUSH(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeLRANGE creates an LRANGE command handler with injected DataStore.
-func MakeLRANGE(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeLRANGE(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) != 4 {
 			return resp.Error("wrong number of arguments for 'lrange'")
 		}
@@ -84,8 +85,8 @@ func MakeLRANGE(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeLLEN creates an LLEN command handler with injected DataStore.
-func MakeLLEN(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeLLEN(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 2 {
 			return resp.Error("wrong number of arguments for 'llen'")
 		}
@@ -103,8 +104,8 @@ func MakeLLEN(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeLPOP creates an LPOP command handler with injected DataStore.
-func MakeLPOP(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeLPOP(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 2 {
 			return resp.Error("wrong number of arguments for 'lpop'")
 		}
@@ -141,8 +142,8 @@ func MakeLPOP(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeBLPOP creates a BLPOP command handler with injected DataStore.
-func MakeBLPOP(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeBLPOP(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 3 {
 			return resp.Error("wrong number of arguments for 'blpop'")
 		}

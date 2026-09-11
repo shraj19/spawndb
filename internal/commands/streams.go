@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 	"github.com/shraj19/flashdb/internal/utilities"
@@ -15,8 +16,8 @@ import (
 // --- Stream command factories (use DataStore) ---
 
 // MakeXADD creates an XADD command handler with injected DataStore.
-func MakeXADD(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeXADD(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 5 || len(args)%2 != 1 {
 			return resp.Error("wrong number of arguments for 'xadd'")
 		}
@@ -43,8 +44,8 @@ func MakeXADD(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeXRANGE creates an XRANGE command handler with injected DataStore.
-func MakeXRANGE(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeXRANGE(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) != 4 {
 			return resp.Error("wrong number of arguments for 'xrange'")
 		}
@@ -70,8 +71,8 @@ func MakeXRANGE(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeXREAD creates an XREAD command handler with injected DataStore.
-func MakeXREAD(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeXREAD(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		parsed, err := parseXREADArgs(args)
 		if err != nil {
 			return resp.Error(err.Error())

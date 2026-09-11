@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/resp"
-	"github.com/shraj19/flashdb/internal/storage"
 )
 
-func MULTI(args []string, client *storage.Client) string {
+func MULTI(args []string, client *core.Client) string {
 	if len(args) != 1 {
 		return resp.Error("wrong number of arguments for 'multi'")
 	}
@@ -22,7 +22,7 @@ func MULTI(args []string, client *storage.Client) string {
 	return resp.OK()
 }
 
-func EXEC(args []string, client *storage.Client) string {
+func EXEC(args []string, client *core.Client) string {
 	if !client.InTransaction {
 		return resp.Error("EXEC without MULTI")
 	}
@@ -42,7 +42,7 @@ func EXEC(args []string, client *storage.Client) string {
 		if cmdName == "DISCARD" || cmdName == "EXEC" || cmdName == "MULTI" {
 			return resp.Error("EXEC aborted on invalid command in transaction")
 		}
-		_, ok := storage.CommandMap[cmdName]
+		_, ok := core.CommandMap[cmdName]
 		if !ok {
 			return resp.Error("EXEC aborted on invalid command in transaction")
 		}
@@ -52,7 +52,7 @@ func EXEC(args []string, client *storage.Client) string {
 	responses := []string{}
 	for _, cmdArgs := range client.QueuedCommands {
 		cmdName := strings.ToUpper(cmdArgs[0])
-		handler := storage.CommandMap[cmdName]
+		handler := core.CommandMap[cmdName]
 		// We can assume 'ok' is true because of the pre-check loop above.
 		response := handler(cmdArgs, client)
 		responses = append(responses, response)
@@ -66,7 +66,7 @@ func EXEC(args []string, client *storage.Client) string {
 	return respBuilder.String()
 }
 
-func DISCARD(args []string, client *storage.Client) string {
+func DISCARD(args []string, client *core.Client) string {
 	if !client.InTransaction {
 		return resp.Error("DISCARD without MULTI")
 	}

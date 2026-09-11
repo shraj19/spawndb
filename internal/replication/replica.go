@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/resp"
-	"github.com/shraj19/flashdb/internal/storage"
 )
 
 func StartReplica(masterHost, masterPort, localPort string) {
@@ -28,9 +28,9 @@ func StartReplica(masterHost, masterPort, localPort string) {
 		backoff = 200 * time.Millisecond
 
 		fmt.Println("replica: connected to master", addr)
-		storage.Replication.Mu.Lock()
-		storage.Replication.Role = "slave"
-		storage.Replication.Mu.Unlock()
+		State.Mu.Lock()
+		State.Role = "slave"
+		State.Mu.Unlock()
 		reader := bufio.NewReader(conn)
 		var localOffset int64 = 0
 
@@ -110,8 +110,8 @@ func StartReplica(masterHost, masterPort, localPort string) {
 					continue
 				}
 
-				if handler, ok := storage.CommandMap[strings.ToUpper(args[0])]; ok {
-					dummyClient := &storage.Client{Conn: nil}
+				if handler, ok := core.CommandMap[strings.ToUpper(args[0])]; ok {
+					dummyClient := &core.Client{Conn: nil}
 					handler(args, dummyClient)
 					if enc, err := resp.EncodeCommand(args); err == nil {
 						localOffset += int64(len(enc))

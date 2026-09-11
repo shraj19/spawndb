@@ -3,11 +3,11 @@ package commands
 import (
 	"testing"
 
-	"github.com/shraj19/flashdb/internal/storage"
+	"github.com/shraj19/flashdb/internal/core"
 )
 
 func TestMULTIEXECQueueAndRunCommands(t *testing.T) {
-	client := &storage.Client{}
+	client := &core.Client{}
 
 	response := MULTI([]string{"MULTI"}, client)
 	if response != "+OK\r\n" {
@@ -21,7 +21,7 @@ func TestMULTIEXECQueueAndRunCommands(t *testing.T) {
 }
 
 func TestDISCARDResetsTransactionState(t *testing.T) {
-	client := &storage.Client{}
+	client := &core.Client{}
 
 	MULTI([]string{"MULTI"}, client)
 	response := DISCARD([]string{"DISCARD"}, client)

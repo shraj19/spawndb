@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/shraj19/flashdb/internal/commands"
+	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/replication"
 	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
@@ -19,8 +20,8 @@ func HandleConnection(conn net.Conn) {
 	defer conn.Close()
 	storage.IncrementClients()
 	defer storage.DecrementClients()
-	// Use storage.Client for per-connection state
-	client := &storage.Client{Conn: conn}
+	// Use Client for per-connection state
+	client := &core.Client{Conn: conn}
 	reader := bufio.NewReader(conn)
 
 	for {
@@ -41,7 +42,7 @@ func HandleConnection(conn net.Conn) {
 		storage.IncrementCommands()
 		cmdName := strings.ToUpper(args[0])
 
-		handler, ok := storage.CommandMap[cmdName]
+		handler, ok := core.CommandMap[cmdName]
 		if !ok {
 			client.Conn.Write([]byte(resp.Error(fmt.Sprintf("unknown command '%s'", args[0]))))
 			continue
@@ -62,9 +63,6 @@ func HandleConnection(conn net.Conn) {
 		}
 
 		// Execute the command normally
-		// The handler now returns a response string, which we write back.
-		// For commands that manage their own connection writing (like blocking commands),
-		// they can return an empty string.
 		response := handler(args, client)
 		if response != "" {
 			client.Conn.Write([]byte(response))
@@ -78,7 +76,7 @@ func StartServer() {
 	db := storage.NewDataStore()
 
 	// Initialize commands with DataStore-based handlers
-	storage.InitCommands(map[string]storage.CommandHandler{
+	core.InitCommands(map[string]core.CommandHandler{
 		// General commands (stateless)
 		"PING":     commands.PING,
 		"ECHO":     commands.ECHO,
@@ -90,7 +88,7 @@ func StartServer() {
 		"TYPE": commands.MakeTYPE(db),
 		"INCR": commands.MakeINCR(db),
 
-		// Transaction commands (use legacy for now - need special handling)
+		// Transaction commands
 		"MULTI":   commands.MULTI,
 		"DISCARD": commands.DISCARD,
 		"EXEC":    commands.EXEC,
@@ -108,7 +106,7 @@ func StartServer() {
 		"XREAD":  commands.MakeXREAD(db),
 		"XRANGE": commands.MakeXRANGE(db),
 
-		// Replication commands (use legacy)
+		// Replication commands
 		"REPLCONF": commands.REPLCONF,
 		"PSYNC":    commands.PSYNC,
 		"WAIT":     commands.WAIT,
@@ -133,18 +131,16 @@ func StartServer() {
 		}
 	}
 	if replicaHost != "" && replicaPort != "" {
-		// Start replication in a separate goroutine so that it doesn't block the main server loop
 		go func() {
-			storage.Replication.Mu.Lock()
-			storage.Replication.Role = "slave"
-			storage.Replication.Mu.Unlock()
+			replication.State.Mu.Lock()
+			replication.State.Role = "slave"
+			replication.State.Mu.Unlock()
 		}()
 		go replication.StartReplica(replicaHost, replicaPort, port)
 	}
 	storage.StartMetricsLogger()
 
 	addr := "0.0.0.0:" + port
-
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {

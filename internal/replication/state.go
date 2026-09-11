@@ -1,33 +1,9 @@
-package storage
+package replication
 
 import (
 	"net"
-	"strings"
 	"sync"
 )
-
-// Client represents a connected client with transaction state.
-type Client struct {
-	Conn           net.Conn
-	InTransaction  bool
-	QueuedCommands [][]string
-}
-
-// CommandHandler is the function signature for a Redis command.
-type CommandHandler func(args []string, client *Client) string
-
-// CommandMap holds registered command handlers.
-var CommandMap map[string]CommandHandler
-
-// InitCommands initializes the command map.
-func InitCommands(commands map[string]CommandHandler) {
-	CommandMap = make(map[string]CommandHandler)
-	for name, handler := range commands {
-		CommandMap[strings.ToUpper(name)] = handler
-	}
-}
-
-// --- Replication types and state ---
 
 // ReplicaConnection represents a connected replica.
 type ReplicaConnection struct {
@@ -47,25 +23,25 @@ type ReplicationState struct {
 	Mu              sync.RWMutex
 }
 
-// Replication is the global replication state.
-var Replication = &ReplicationState{
+// State is the global replication state singleton.
+var State = &ReplicationState{
 	Role:     "master",
 	ReplID:   "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb",
 	Offset:   0,
 	Replicas: make(map[string]*ReplicaConnection),
 }
 
-// EnsureReplication ensures replication state is initialized.
-func EnsureReplication() *ReplicationState {
-	if Replication == nil {
-		Replication = &ReplicationState{
+// EnsureState ensures replication state is initialized.
+func EnsureState() *ReplicationState {
+	if State == nil {
+		State = &ReplicationState{
 			Role:     "master",
 			ReplID:   "",
 			Offset:   0,
 			Replicas: make(map[string]*ReplicaConnection),
 		}
 	}
-	return Replication
+	return State
 }
 
 // IncreaseOffset atomically increases the replication offset.

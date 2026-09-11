@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shraj19/flashdb/internal/core"
+	"github.com/shraj19/flashdb/internal/replication"
 	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 )
@@ -12,8 +14,8 @@ import (
 // --- String command factories (use DataStore) ---
 
 // MakeSET creates a SET command handler with injected DataStore.
-func MakeSET(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeSET(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 3 {
 			return resp.Error("wrong number of arguments for 'set'")
 		}
@@ -65,8 +67,8 @@ func MakeSET(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeGET creates a GET command handler with injected DataStore.
-func MakeGET(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeGET(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 2 {
 			return resp.Error("wrong number of arguments for 'get'")
 		}
@@ -82,8 +84,8 @@ func MakeGET(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeTYPE creates a TYPE command handler with injected DataStore.
-func MakeTYPE(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeTYPE(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) != 2 {
 			return resp.Error("wrong number of arguments for 'type'")
 		}
@@ -100,8 +102,8 @@ func MakeTYPE(db storage.DataStore) storage.CommandHandler {
 }
 
 // MakeINCR creates an INCR command handler with injected DataStore.
-func MakeINCR(db storage.DataStore) storage.CommandHandler {
-	return func(args []string, client *storage.Client) string {
+func MakeINCR(db storage.DataStore) core.CommandHandler {
+	return func(args []string, client *core.Client) string {
 		if len(args) < 2 {
 			return resp.Error("wrong number of arguments for 'incr'")
 		}
@@ -133,13 +135,13 @@ func propagateToReplicas(args []string) {
 		return
 	}
 
-	replication := storage.EnsureReplication()
-	replication.IncreaseOffset(int64(len(encoded)))
-	replication.Mu.RLock()
-	for _, rep := range replication.Replicas {
+	repl := replication.EnsureState()
+	repl.IncreaseOffset(int64(len(encoded)))
+	repl.Mu.RLock()
+	for _, rep := range repl.Replicas {
 		if rep != nil && rep.Connected && rep.Conn != nil {
 			_, _ = rep.Conn.Write(encoded)
 		}
 	}
-	replication.Mu.RUnlock()
+	repl.Mu.RUnlock()
 }
