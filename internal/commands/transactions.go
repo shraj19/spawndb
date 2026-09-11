@@ -3,10 +3,16 @@ package commands
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/shraj19/flashdb/internal/core"
 	"github.com/shraj19/flashdb/internal/resp"
 )
+
+// execLock ensures MULTI/EXEC transactions are atomic and isolated.
+// Only one EXEC can run at a time, preventing command interleaving.
+// Matches Redis single-threaded semantics.
+var execLock sync.Mutex
 
 func MULTI(args []string, client *core.Client) string {
 	if len(args) != 1 {
@@ -48,7 +54,11 @@ func EXEC(args []string, client *core.Client) string {
 		}
 	}
 
-	// Phase 2: Execute all commands since they passed the pre-check.
+	// Phase 2: Execute all commands atomically under global lock.
+	// This ensures no other client's commands interleave during transaction.
+	execLock.Lock()
+	defer execLock.Unlock()
+
 	responses := []string{}
 	for _, cmdArgs := range client.QueuedCommands {
 		cmdName := strings.ToUpper(cmdArgs[0])
