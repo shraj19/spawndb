@@ -4,9 +4,17 @@ Tracks ongoing refactoring, design decisions, and next steps.
 
 ---
 
-## Recent Commits (Sep 8-10, 2026)
+## Recent Commits (Sep 8-11, 2026)
 
 ```
+8296f45 test(storage): add tests for DataStore facade
+e07cb3f refactor(storage): implement DataStore facade as composition root
+01d2f80 test(storage): add tests for StreamStore
+f8d79e1 refactor(storage): implement StreamStore with waiters and blocking reads
+bf8ebd3 test(storage): add tests for TTL, Registry, StringStore, ListStore
+c3340e6 refactor(storage): implement ListStore with waiters and BLPop multi-key fix
+10a7aaf refactor(storage): implement StringStore with type safety and lazy expiry
+80f6022 refactor(storage): add TTLManager and TypeRegistry with lazy expiry
 e059b25 test: add table-driven tests for stream helpers
 9aeaa34 refactor: extract helpers from streams, improve SRP
 6630216 fix: add RLock to LRANGE to prevent race condition
@@ -162,7 +170,7 @@ storage/
 - Interfaces: `Registry`, `StringStore`, `ListStore`, `StreamStore`, `DataStore`
 
 **Step 2: ttl.go + registry.go**
-- `TTLManager` — Set, SetTTL, Get, IsExpired, CheckAndDelete, Remaining
+- `TTLManager` — Set, SetTTL, Get, IsExpired, CheckAndDelete, Remaining, Snapshot
 - `typeRegistry` — Acquire, Release, SetTTL, GetTTL, Type, Keys
 - Dependency injection: Registry depends on TTLManager
 
@@ -180,17 +188,83 @@ storage/
 - LRange returns copy to avoid exposing internal slice
 - BLPop with timeout, multi-key support, proper waiter cleanup
 
-**Step 4b: storage_test.go (21 tests)**
-- TTLManager: SetAndCheck, CheckAndDelete, Remaining
-- Registry: AcquireAndType, Release, ExpiredKeyReuse
-- StringStore: SetGet, SetWithTTL, ExpiredKey, WrongType, IncrBy, Delete
-- ListStore: PushAndRange, LLen, LPop, WrongType, BLPop (immediate, priority, blocking, multi-key, timeout)
+**Step 5: streams.go (StreamStore)**
+- Implements full StreamStore interface
+- XAdd, XRange, XRead, XReadBlock
+- Waiters inside store (StreamWaiters)
+- resolveReadIDs, queryStreams helpers
+- Deep copy on XRange to prevent mutation
+
+**Step 6: datastore.go (DataStore facade)**
+- Composition root: `NewDataStore()` wires TTL → Registry → all stores
+- Polymorphic Delete (checks type, delegates to correct store)
+- Type() and Exists() facade methods
+- 6 tests covering composition, type safety, cross-store interaction
+
+**Step 7: Command migration to DataStore (IN PROGRESS)**
+- Created factory functions: `MakeSET`, `MakeGET`, `MakeTYPE`, `MakeINCR`
+- Created factory functions: `MakeRPUSH`, `MakeLPUSH`, `MakeLRANGE`, `MakeLLEN`, `MakeLPOP`, `MakeBLPOP`
+- Created factory functions: `MakeXADD`, `MakeXRANGE`, `MakeXREAD`
+- Updated server.go to create DataStore and use factories
+- Legacy handlers kept for backward compatibility during migration
 
 ### Remaining Steps
-- Step 5: streams.go (StreamStore with StreamWaiters)
-- Step 6: database.go (facade)
-- Step 7: migrate commands to use new stores
-- Step 8: delete old globals
+- Step 8: Delete legacy handlers and old globals
+- Step 9: Update persistence to use DataStore
+- Step 10: Clean up unused code in storage.go
+
+---
+
+## Design Decision: Command Factory Pattern (Sep 11)
+
+### Problem
+Command handlers have signature `func(args []string, client *Client) string`.
+No place to pass `DataStore` dependency.
+
+### Solution: Factory Pattern with Closure Capture
+
+```go
+func MakeSET(db storage.DataStore) storage.CommandHandler {
+    return func(args []string, client *storage.Client) string {
+        db.Strings().Set(args[1], args[2])  // db captured in closure
+        return resp.OK()
+    }
+}
+
+// Server wires it once at startup
+db := storage.NewDataStore()
+commands["SET"] = MakeSET(db)
+```
+
+### Alternatives Considered
+
+| Alternative | Pros | Cons | Decision |
+|-------------|------|------|----------|
+| **Change handler signature** | Explicit dependency | Changes ALL call sites (server, EXEC, replication) | ❌ Too invasive |
+| **Global DataStore** | Zero changes | Back to global state, untestable | ❌ Defeats purpose |
+| **Context struct** | Extensible | Still changes signature | ❌ Same invasion |
+| **Method on struct** | OOP style | Verbose, un-Go-like | ❌ Not idiomatic |
+| **Factory pattern** ✓ | Minimal changes, testable, no globals | Slight verbosity | ✅ Chosen |
+
+### Why Factory Won
+- Handler signature unchanged — no changes to dispatch, EXEC, replication
+- Testable — create isolated DataStore per test, no global reset
+- No globals — DataStore captured in closure, not package-level var
+- Go idiomatic — functions returning functions is common pattern
+
+### Testing Benefits
+
+```go
+func TestSET(t *testing.T) {
+    db := storage.NewDataStore()  // isolated per test
+    handler := MakeSET(db)
+    
+    handler([]string{"SET", "key", "value"}, nil)
+    
+    val, _ := db.Strings().Get("key")
+    assert.Equal(t, "value", val)  // no global state to reset
+}
+```
 
 ---
 
@@ -246,6 +320,24 @@ _(TODO: mine from commits)_
 **T:** If user does `BLPOP high medium low 0` and `low` gets data first, should unblock.
 **A:** Register waiter channel on ALL keys. On wake or timeout, remove from ALL keys.
 **R:** Correct priority queue behavior. Test `TestListStore_BLPop_MultiKeyBlocking` verifies the fix.
+
+### XReadBlock $ Resolution Race (Sep 11)
+**S:** `$` in XREAD means "only new entries." Must resolve to last ID atomically with waiter registration.
+**T:** If resolved in command layer, race window exists: entry added between resolve and register → missed.
+**A:** Keep `$` resolution inside `XReadBlock`, under the same lock as waiter registration. Extract to `resolveReadIDs` helper for readability.
+**R:** Single lock acquisition, no race. Small design sacrifice (store knows about `$` syntax) for correctness.
+
+### ForEach O(n) Lock Problem (Sep 10)
+**S:** `ForEach` for persistence was calling `ttl.IsExpired(key)` per key — O(n) lock acquisitions while holding store lock.
+**T:** Reduce lock contention during RDB save.
+**A:** Added `TTLManager.Snapshot()` — copies all expiry data in one lock. ForEach uses snapshot.
+**R:** 2 locks total instead of 2n. Save operation no longer hammers TTL mutex.
+
+### DataStore as Composition Root (Sep 11)
+**S:** New stores built (StringStore, ListStore, StreamStore) but no way to wire them together.
+**T:** Need single entry point that assembles all dependencies correctly.
+**A:** Created `NewDataStore()` as composition root. Wires: TTLManager → Registry → all stores. Returns `DataStore` interface.
+**R:** One place to construct entire storage layer. Commands receive interface, not concrete types. Testable with mock if needed.
 
 ---
 
