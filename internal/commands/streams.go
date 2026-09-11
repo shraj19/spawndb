@@ -12,7 +12,111 @@ import (
 	"github.com/shraj19/flashdb/internal/utilities"
 )
 
-// --- Errors ---
+// --- Stream command factories (use DataStore) ---
+
+// MakeXADD creates an XADD command handler with injected DataStore.
+func MakeXADD(db storage.DataStore) storage.CommandHandler {
+	return func(args []string, client *storage.Client) string {
+		if len(args) < 5 || len(args)%2 != 1 {
+			return resp.Error("wrong number of arguments for 'xadd'")
+		}
+
+		streamKey := args[1]
+		inputID := args[2]
+
+		// Build fields map
+		fields := make(map[string]string)
+		for i := 3; i < len(args); i += 2 {
+			fields[args[i]] = args[i+1]
+		}
+
+		id, err := db.Streams().XAdd(streamKey, inputID, fields)
+		if err == storage.ErrWrongType {
+			return resp.Error("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		if err != nil {
+			return resp.Error(err.Error())
+		}
+
+		return resp.BulkString(id)
+	}
+}
+
+// MakeXRANGE creates an XRANGE command handler with injected DataStore.
+func MakeXRANGE(db storage.DataStore) storage.CommandHandler {
+	return func(args []string, client *storage.Client) string {
+		if len(args) != 4 {
+			return resp.Error("wrong number of arguments for 'xrange'")
+		}
+
+		streamKey, startID, endID := args[1], args[2], args[3]
+
+		entries, err := db.Streams().XRange(streamKey, startID, endID)
+		if err == storage.ErrWrongType {
+			return resp.Error("WRONGTYPE Operation against a key holding the wrong kind of value")
+		}
+		if err != nil {
+			return resp.Error(err.Error())
+		}
+
+		if len(entries) == 0 {
+			return resp.EmptyArray()
+		}
+
+		var b strings.Builder
+		encodeStreamEntries(&b, entries)
+		return b.String()
+	}
+}
+
+// MakeXREAD creates an XREAD command handler with injected DataStore.
+func MakeXREAD(db storage.DataStore) storage.CommandHandler {
+	return func(args []string, client *storage.Client) string {
+		parsed, err := parseXREADArgs(args)
+		if err != nil {
+			return resp.Error(err.Error())
+		}
+
+		// Non-blocking read
+		if parsed.blockTime < 0 {
+			result := db.Streams().XRead(parsed.streamKeys, parsed.streamIDs)
+			return encodeXREADResult(result)
+		}
+
+		// Blocking read
+		timeout := time.Duration(parsed.blockTime) * time.Millisecond
+		result, err := db.Streams().XReadBlock(parsed.streamKeys, parsed.streamIDs, timeout)
+		if err != nil {
+			return resp.Error(err.Error())
+		}
+
+		if result == nil {
+			// Timeout - write directly
+			client.Conn.Write([]byte(resp.NullArray()))
+			return ""
+		}
+
+		// Got data - write directly
+		client.Conn.Write([]byte(encodeXREADResult(result)))
+		return ""
+	}
+}
+
+// encodeXREADResult encodes map[string][]StreamEntry as RESP array.
+func encodeXREADResult(result map[string][]storage.StreamEntry) string {
+	if len(result) == 0 {
+		return resp.NullArray()
+	}
+
+	var b strings.Builder
+	fmt.Fprintf(&b, "*%d\r\n", len(result))
+	for key, entries := range result {
+		encodeStreamResult(&b, key, entries)
+	}
+	return b.String()
+}
+
+// --- Errors (legacy) ---
 
 var (
 	errInvalidIDFormat = errors.New("invalid stream ID format")

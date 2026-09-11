@@ -74,32 +74,45 @@ func HandleConnection(conn net.Conn) {
 
 // StartServer starts the Redis-like server
 func StartServer() {
-	// Start any background tasks like key expiry
+	// Create the DataStore - this is the composition root
+	db := storage.NewDataStore()
+
+	// Initialize commands with DataStore-based handlers
 	storage.InitCommands(map[string]storage.CommandHandler{
+		// General commands (stateless)
 		"PING":     commands.PING,
 		"ECHO":     commands.ECHO,
 		"INFO":     commands.INFO,
-		"SET":      commands.SETvalue,
-		"GET":      commands.GETvalue,
-		"TYPE":     commands.TYPE,
-		"INCR":     commands.INCR,
-		"MULTI":    commands.MULTI,
-		"DISCARD":  commands.DISCARD,
-		"EXEC":     commands.EXEC,
-		"LPUSH":    commands.LPUSH,
-		"RPUSH":    commands.RPUSH,
-		"LPOP":     commands.LPOP,
-		"BLPOP":    commands.BLPOP,
-		"LRANGE":   commands.LRANGE,
-		"LLEN":     commands.LLEN,
-		"XADD":     commands.XADD,
-		"XREAD":    commands.XREAD,
-		"XRANGE":   commands.XRANGE,
+
+		// String commands (use DataStore)
+		"SET":  commands.MakeSET(db),
+		"GET":  commands.MakeGET(db),
+		"TYPE": commands.MakeTYPE(db),
+		"INCR": commands.MakeINCR(db),
+
+		// Transaction commands (use legacy for now - need special handling)
+		"MULTI":   commands.MULTI,
+		"DISCARD": commands.DISCARD,
+		"EXEC":    commands.EXEC,
+
+		// List commands (use DataStore)
+		"LPUSH":  commands.MakeLPUSH(db),
+		"RPUSH":  commands.MakeRPUSH(db),
+		"LPOP":   commands.MakeLPOP(db),
+		"BLPOP":  commands.MakeBLPOP(db),
+		"LRANGE": commands.MakeLRANGE(db),
+		"LLEN":   commands.MakeLLEN(db),
+
+		// Stream commands (use DataStore)
+		"XADD":   commands.MakeXADD(db),
+		"XREAD":  commands.MakeXREAD(db),
+		"XRANGE": commands.MakeXRANGE(db),
+
+		// Replication commands (use legacy)
 		"REPLCONF": commands.REPLCONF,
 		"PSYNC":    commands.PSYNC,
 		"WAIT":     commands.WAIT,
 	})
-	storage.StartActiveExpiry()
 
 	port := "6379"
 	replicaHost := ""
