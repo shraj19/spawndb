@@ -30,7 +30,6 @@ func (l *listStore) LPush(key string, values ...string) (int, error) {
 	}
 
 	l.mu.Lock()
-	defer l.mu.Unlock()
 
 	list := l.data[key]
 
@@ -43,25 +42,56 @@ func (l *listStore) LPush(key string, values ...string) (int, error) {
 		i++
 	}
 
-	// Wake earliest waiters first
-	delivered := 0
+	// Collect waiters to notify (we'll deliver OUTSIDE the lock)
+	type delivery struct {
+		ch  chan [2]string
+		val [2]string
+	}
+	var toDeliver []delivery
+
+	// Match values to waiters
 	for len(l.waiters[key]) > 0 && len(reversed) > 0 {
 		ch := l.waiters[key][0]
 		l.waiters[key] = l.waiters[key][1:]
 
 		v := reversed[0]
 		reversed = reversed[1:]
-		delivered++
-		ch <- [2]string{key, v}
+
+		// CRITICAL: Remove this waiter from ALL keys it's registered on
+		// This prevents double-delivery when the same waiter is on multiple keys
+		l.removeWaiterFromAllKeys(ch)
+
+		toDeliver = append(toDeliver, delivery{ch: ch, val: [2]string{key, v}})
 	}
 
-	// Prepend remaining values
+	// Prepend remaining values to list
 	if len(reversed) > 0 {
 		list = append(reversed, list...)
 	}
 
 	l.data[key] = list
-	return len(list) + delivered, nil
+	finalLen := len(list)
+
+	l.mu.Unlock()
+
+	// Deliver OUTSIDE the lock to prevent deadlock
+	for _, d := range toDeliver {
+		// Non-blocking send — if channel is somehow already satisfied, value is lost
+		// This shouldn't happen with proper waiter removal, but defensive
+		select {
+		case d.ch <- d.val:
+		default:
+			// Waiter was already satisfied (race with another key's push)
+			// Re-add the value to the list
+			l.mu.Lock()
+			l.data[key] = append([]string{d.val[1]}, l.data[key]...)
+			finalLen = len(l.data[key])
+			l.mu.Unlock()
+		}
+	}
+
+	// Return list length AFTER push (not including delivered items)
+	return finalLen, nil
 }
 
 func (l *listStore) RPush(key string, values ...string) (int, error) {
@@ -71,12 +101,17 @@ func (l *listStore) RPush(key string, values ...string) (int, error) {
 	}
 
 	l.mu.Lock()
-	defer l.mu.Unlock()
 
 	list := l.data[key]
 
-	// Wake blocked waiters first (FIFO order)
-	delivered := 0
+	// Collect waiters to notify (we'll deliver OUTSIDE the lock)
+	type delivery struct {
+		ch  chan [2]string
+		val [2]string
+	}
+	var toDeliver []delivery
+
+	// Match values to waiters (FIFO order)
 	toAppend := values
 	for len(l.waiters[key]) > 0 && len(toAppend) > 0 {
 		ch := l.waiters[key][0]
@@ -84,17 +119,38 @@ func (l *listStore) RPush(key string, values ...string) (int, error) {
 
 		v := toAppend[0]
 		toAppend = toAppend[1:]
-		delivered++
-		ch <- [2]string{key, v}
+
+		// CRITICAL: Remove this waiter from ALL keys it's registered on
+		l.removeWaiterFromAllKeys(ch)
+
+		toDeliver = append(toDeliver, delivery{ch: ch, val: [2]string{key, v}})
 	}
 
-	// Append remaining values
+	// Append remaining values to list
 	if len(toAppend) > 0 {
 		list = append(list, toAppend...)
 	}
 
 	l.data[key] = list
-	return len(list) + delivered, nil
+	finalLen := len(list)
+
+	l.mu.Unlock()
+
+	// Deliver OUTSIDE the lock to prevent deadlock
+	for _, d := range toDeliver {
+		select {
+		case d.ch <- d.val:
+		default:
+			// Re-add to end of list if delivery failed
+			l.mu.Lock()
+			l.data[key] = append(l.data[key], d.val[1])
+			finalLen = len(l.data[key])
+			l.mu.Unlock()
+		}
+	}
+
+	// Return list length AFTER push (not including delivered items)
+	return finalLen, nil
 }
 
 func (l *listStore) LRange(key string, start, stop int) ([]string, error) {
@@ -225,7 +281,7 @@ func (l *listStore) BLPop(keys []string, timeout time.Duration) (key, value stri
 	}
 }
 
-// removeWaiter removes a specific waiter channel. Caller must hold lock.
+// removeWaiter removes a specific waiter channel from one key. Caller must hold lock.
 func (l *listStore) removeWaiter(key string, ch chan [2]string) {
 	waiters := l.waiters[key]
 	for i, w := range waiters {
@@ -236,6 +292,15 @@ func (l *listStore) removeWaiter(key string, ch chan [2]string) {
 	}
 	if len(l.waiters[key]) == 0 {
 		delete(l.waiters, key)
+	}
+}
+
+// removeWaiterFromAllKeys removes a waiter channel from ALL keys it's registered on.
+// This prevents double-delivery when the same waiter is registered on multiple keys.
+// Caller must hold lock.
+func (l *listStore) removeWaiterFromAllKeys(ch chan [2]string) {
+	for key := range l.waiters {
+		l.removeWaiter(key, ch)
 	}
 }
 

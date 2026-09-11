@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"sync"
 	"testing"
 	"time"
 )
@@ -330,5 +331,153 @@ func TestListStore_BLPop_WaiterCleanupOnTimeout(t *testing.T) {
 	items, _ := store.LRange("key1", 0, -1)
 	if len(items) != 1 || items[0] != "item" {
 		t.Errorf("expected [item], got %v", items)
+	}
+}
+
+
+
+// TestListStore_BLPop_MultiKeyDeadlock tests the critical deadlock bug:
+// If BLPOP registers one waitCh on multiple keys, and concurrent LPUSHes
+// happen on both keys, the second LPUSH blocks forever because the channel
+// buffer(1) is already full and the send happens WHILE HOLDING l.mu.
+//
+// Expected behavior: The system should NOT deadlock. Either:
+// - The second push's value goes to the list (waiter already satisfied)
+// - Or the send is non-blocking and drops gracefully
+func TestListStore_BLPop_MultiKeyDeadlock(t *testing.T) {
+	// Run multiple iterations to increase chance of hitting the race
+	for iter := 0; iter < 10; iter++ {
+		store, _ := newListStoreWithDeps()
+
+		// Setup: BLPop waiting on both "a" and "b"
+		consumerDone := make(chan struct{})
+		go func() {
+			defer close(consumerDone)
+			// This BLPop registers ONE waitCh on BOTH keys
+			_, _, _ = store.BLPop([]string{"a", "b"}, 5*time.Second)
+		}()
+
+		// Give consumer time to register waiters on both keys
+		time.Sleep(20 * time.Millisecond)
+
+		// Barrier to make both pushes start simultaneously
+		ready := make(chan struct{})
+		push1Done := make(chan struct{})
+		push2Done := make(chan struct{})
+
+		go func() {
+			defer close(push1Done)
+			<-ready
+			store.LPush("a", "value_a")
+		}()
+
+		go func() {
+			defer close(push2Done)
+			<-ready
+			store.LPush("b", "value_b")
+		}()
+
+		// Start both at once
+		close(ready)
+
+		// If there's a deadlock, pushes will hang forever
+		timeout := time.After(1 * time.Second)
+
+		select {
+		case <-push1Done:
+		case <-timeout:
+			t.Fatalf("DEADLOCK on iteration %d: LPUSH a did not complete", iter)
+		}
+
+		select {
+		case <-push2Done:
+		case <-timeout:
+			t.Fatalf("DEADLOCK on iteration %d: LPUSH b did not complete", iter)
+		}
+
+		select {
+		case <-consumerDone:
+		case <-timeout:
+			t.Fatalf("DEADLOCK on iteration %d: BLPop did not complete", iter)
+		}
+	}
+}
+
+// TestListStore_BLPop_DoubleDelivery tests that a waiter on multiple keys
+// only receives ONE value, not values from multiple keys.
+func TestListStore_BLPop_DoubleDelivery(t *testing.T) {
+	store, _ := newListStoreWithDeps()
+
+	received := make(chan [2]string, 10) // Buffer to catch multiple deliveries
+
+	// Consumer
+	go func() {
+		key, val, ok := store.BLPop([]string{"a", "b"}, 5*time.Second)
+		if ok {
+			received <- [2]string{key, val}
+		}
+		close(received)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Push to both keys nearly simultaneously
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		store.LPush("a", "val_a")
+	}()
+	go func() {
+		defer wg.Done()
+		store.LPush("b", "val_b")
+	}()
+	wg.Wait()
+
+	// Collect what the consumer received
+	time.Sleep(100 * time.Millisecond)
+	var deliveries [][2]string
+	for kv := range received {
+		deliveries = append(deliveries, kv)
+	}
+
+	// Should receive exactly ONE value
+	if len(deliveries) != 1 {
+		t.Errorf("BLPop should receive exactly 1 value, got %d: %v", len(deliveries), deliveries)
+	}
+
+	// One value should be in the lists
+	lenA, _ := store.LLen("a")
+	lenB, _ := store.LLen("b")
+	if lenA+lenB != 1 {
+		t.Errorf("expected 1 item remaining, got a=%d b=%d", lenA, lenB)
+	}
+}
+
+// TestListStore_RPush_ReturnCount verifies that RPush returns the correct count.
+// Redis: RPUSH returns the length of the list AFTER the push.
+// Elements delivered directly to waiters are NOT in the list.
+func TestListStore_RPush_ReturnCount(t *testing.T) {
+	store, _ := newListStoreWithDeps()
+
+	// Setup: BLPop waiting
+	consumerDone := make(chan struct{})
+	go func() {
+		defer close(consumerDone)
+		store.BLPop([]string{"mylist"}, 5*time.Second)
+	}()
+	time.Sleep(50 * time.Millisecond)
+
+	// RPUSH should deliver to waiter, not add to list
+	n, _ := store.RPush("mylist", "value")
+
+	// Wait for consumer
+	<-consumerDone
+
+	// Redis behavior: returned count = list length after push
+	// If delivered to waiter, list is empty, so count should be 0
+	llen, _ := store.LLen("mylist")
+	if n != llen {
+		t.Errorf("RPUSH returned %d but LLEN is %d (should match for Redis compat)", n, llen)
 	}
 }
