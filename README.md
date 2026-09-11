@@ -117,6 +117,8 @@ flashdb/
 │   └── server/
 │       └── main.go          # Alternative entry point
 ├── internal/
+│   ├── core/
+│   │   └── types.go         # Shared types (Client, CommandHandler)
 │   ├── commands/
 │   │   ├── general.go       # PING, ECHO, INFO, WAIT, REPLCONF, PSYNC
 │   │   ├── strings.go       # SET, GET, INCR, TYPE
@@ -126,15 +128,22 @@ flashdb/
 │   ├── persistence/
 │   │   └── rdb.go           # Binary snapshot save/load
 │   ├── replication/
+│   │   ├── state.go         # ReplicationState, replica tracking
 │   │   └── replica.go       # Replica connection and sync logic
 │   ├── resp/
-│   │   └── resp.go          # RESP protocol parser
+│   │   └── resp.go          # RESP protocol encoder/decoder
 │   ├── server/
 │   │   └── server.go        # TCP server & client handler
 │   ├── storage/
-│   │   ├── database.go      # Thread-safe key-value store
-│   │   ├── storage.go       # Global state, streams, lists
-│   │   └── metrics.go       # Connection and command metrics
+│   │   ├── interfaces.go    # DataStore, StringStore, ListStore, StreamStore
+│   │   ├── types.go         # Data types, errors, StreamEntry
+│   │   ├── keylock.go       # Per-key sharded locking (256 buckets)
+│   │   ├── datastore.go     # Composition root, atomic operations
+│   │   ├── strings.go       # String store implementation
+│   │   ├── lists.go         # List store with blocking ops
+│   │   ├── streams.go       # Stream store with blocking reads
+│   │   ├── registry.go      # Type registry (WRONGTYPE checks)
+│   │   └── ttl.go           # TTL manager with lazy expiry
 │   └── utilities/
 │       └── utilities.go     # Helper functions
 ```
@@ -142,10 +151,21 @@ flashdb/
 ## Performance Features
 
 - **Goroutine-per-connection:** Concurrent client handling with dedicated goroutines
-- **RWMutex optimization:** Read-write mutex allows concurrent reads
+- **Per-key locking:** Sharded KeyLock (256 buckets) enables fine-grained concurrency without global contention
+- **RWMutex optimization:** Read-write mutex allows concurrent reads within stores
 - **Lazy + Active expiration:** TTL keys expired on access and via background sweep
 - **Atomic persistence:** Temp file + rename pattern prevents corruption
 - **Metrics logging:** Background task logs keys, clients, and commands every 10s
+
+## Concurrency Safety
+
+FlashDB is designed for concurrent access with multiple safety mechanisms:
+
+- **Per-key atomicity:** Operations like SET, GET, LPUSH are atomic per-key via KeyLock
+- **Cross-store consistency:** Registry + data store operations protected against TOCTOU races
+- **Transaction isolation:** MULTI/EXEC runs under global lock, preventing command interleaving
+- **Blocking operations:** BLPOP/XREAD BLOCK handle multi-key waiter cleanup atomically
+- **Replication safety:** Per-replica write serialization prevents RESP framing corruption
 
 ## Development
 
