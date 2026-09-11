@@ -341,6 +341,135 @@ _(TODO: mine from commits)_
 
 ---
 
+## Testing Philosophy
+
+### The Testing Pyramid
+
+```
+         /\
+        /  \     E2E (few, slow, high confidence)
+       /----\
+      /      \   Integration (medium)
+     /--------\
+    /          \  Unit Tests (many, fast, isolated)
+   --------------
+```
+
+**Unit tests** — Test one component in isolation. Mock dependencies.
+**Integration tests** — Test components working together. Real dependencies.
+**E2E tests** — Test the whole system through external interface.
+
+Each layer has ONE owner. Don't test the same behavior at multiple layers.
+
+### Contract Testing (Preferred Approach)
+
+**Core idea:** Each component has a *contract* — what it promises to do. Tests verify the contract, not implementation details.
+
+#### How It Works
+
+```go
+// StringStore's CONTRACT:
+// - Set(k, v) stores v under k
+// - Get(k) returns v if exists, ("", false) if not
+// - Get on expired key returns ("", false)
+// - IncrBy on non-integer returns error
+
+// StringStore contract tests verify ONLY these promises
+func TestStringStore_Contract(t *testing.T) {
+    store := NewStringStore(...)
+    
+    store.Set("k", "v")
+    got, ok := store.Get("k")
+    assert(ok && got == "v")  // contract: Set then Get returns value
+}
+```
+
+```go
+// MakeSET's CONTRACT:
+// - Parses args correctly
+// - Calls StringStore.Set (or SetWithTTL)
+// - Returns "+OK\r\n" on success
+// - Returns error on wrong args
+
+// MakeSET contract tests verify ONLY these promises
+// It ASSUMES StringStore works (proven by StringStore's contract tests)
+func TestMakeSET_Contract(t *testing.T) {
+    mockStore := &MockStringStore{}  // or real store
+    handler := MakeSET(mockStore)
+    
+    result := handler([]string{"SET", "k", "v"}, nil)
+    assert(result == "+OK\r\n")           // contract: returns OK
+    assert(mockStore.SetWasCalled("k","v")) // contract: called Set
+}
+```
+
+#### Why Contract Testing Reduces Redundancy
+
+| Without Contracts | With Contracts |
+|-------------------|----------------|
+| StringStore tests "Set stores value" | StringStore tests "Set stores value" |
+| MakeSET tests "Set stores value" (redundant!) | MakeSET tests "calls Set correctly" (different!) |
+| Integration tests "Set stores value" (triple redundant!) | Integration tests "whole flow works" (different!) |
+
+Each layer tests **its own responsibility**, not its dependencies' responsibilities.
+
+#### Contracts as Documentation
+
+The contract IS the interface documentation:
+
+```go
+// StringStore is the contract for string storage.
+// 
+// Contract:
+// - Set(k,v) stores v; overwrites existing; clears TTL
+// - SetWithTTL(k,v,ttl) stores v with expiration
+// - Get(k) returns (v, true) or ("", false) if missing/expired
+// - IncrBy(k,n) atomically adds n; returns error if not integer
+// - Delete(k) removes key; returns true if existed
+type StringStore interface {
+    Set(key, value string) error
+    SetWithTTL(key, value string, ttl time.Duration) error
+    Get(key string) (string, bool)
+    IncrBy(key string, delta int64) (int64, error)
+    Delete(key string) bool
+}
+```
+
+Tests prove the implementation honors the contract. If tests pass, callers can trust the contract.
+
+#### When to Use Mocks vs Real Dependencies
+
+| Situation | Use Mock | Use Real |
+|-----------|----------|----------|
+| Unit testing a component | ✓ | |
+| Dependency is slow (DB, network) | ✓ | |
+| Dependency is hard to set up | ✓ | |
+| Testing integration between components | | ✓ |
+| Dependency is fast and simple | | ✓ |
+| Contract is complex and easy to mock wrong | | ✓ |
+
+**Our approach:** Real dependencies for now (NewDataStore is fast). Mocks when testing edge cases the real store can't easily produce.
+
+### FlashDB Test Structure (Post-Cleanup)
+
+```
+storage/*_test.go        → Contract tests for stores
+                           "Does StringStore honor its contract?"
+                           
+commands/factory_test.go → Contract tests for command factories
+                           "Does MakeSET parse, call store, return RESP correctly?"
+                           Assumes stores work (proven by storage tests)
+
+replication/*_test.go    → Integration tests for replication
+                           "Does SET propagate to replicas correctly?"
+```
+
+**Redundant (to delete):**
+- `commands/strings_test.go` — legacy handler tests
+- `commands/lists_test.go` — legacy handler tests
+
+---
+
 ## Open Questions
 
 - Should `Client` (transaction state) move to `server` package instead of `storage`?
