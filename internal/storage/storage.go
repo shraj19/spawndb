@@ -6,10 +6,6 @@ import (
 	"sync"
 )
 
-// DB is the legacy database instance used by persistence layer.
-// TODO: Migrate persistence to use DataStore, then remove this.
-var DB = New()
-
 // Client represents a connected client with transaction state.
 type Client struct {
 	Conn           net.Conn

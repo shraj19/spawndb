@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"net"
+	"time"
 )
 
 // --- Data Types ---
@@ -36,6 +37,15 @@ var (
 	ErrNotFound  = errors.New("key not found")
 	ErrNotInt    = errors.New("value is not an integer or out of range")
 )
+
+// --- TTL Types ---
+
+// TTLResult holds TTL query result.
+type TTLResult struct {
+	Duration time.Duration
+	Exists   bool
+	HasTTL   bool
+}
 
 // --- Stream Types ---
 

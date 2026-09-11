@@ -16,10 +16,10 @@ const (
 	version = byte(1)
 )
 
-// Save writes the current database state to disk at the given path.
+// Save writes the database state to disk at the given path.
 // Uses atomic write: writes to temp file, then renames.
 // Skips expired keys.
-func Save(path string) error {
+func Save(path string, db storage.DataStore) error {
 	dir := filepath.Dir(path)
 
 	file, err := os.CreateTemp(dir, "flashdb_*.tmp")
@@ -36,9 +36,9 @@ func Save(path string) error {
 		return err
 	}
 
-	// Write entries using Database iterator
+	// Write string entries
 	var writeErr error
-	storage.DB.ForEachString(func(key, value string, expiry time.Time, hasTTL bool) {
+	db.Strings().ForEach(func(key, value string, expiry time.Time, hasTTL bool) {
 		if writeErr != nil {
 			return
 		}
@@ -74,9 +74,9 @@ func Save(path string) error {
 	return os.Rename(file.Name(), path)
 }
 
-// Load reads database state from disk and populates storage.
+// Load reads database state from disk and populates the DataStore.
 // Skips keys that have already expired.
-func Load(path string) error {
+func Load(path string, db storage.DataStore) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -120,13 +120,13 @@ func Load(path string) error {
 			continue
 		}
 
-		// Load into database
+		// Load into DataStore
 		hasTTL := expiryUnix != 0
 		var expiry time.Time
 		if hasTTL {
 			expiry = time.Unix(expiryUnix, 0)
 		}
-		storage.DB.LoadString(key, value, expiry, hasTTL)
+		db.Strings().Load(key, value, expiry, hasTTL)
 	}
 
 	return nil

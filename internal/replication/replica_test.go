@@ -14,9 +14,6 @@ import (
 )
 
 func TestStartReplicaAppliesPropagatedSET(t *testing.T) {
-	// Clear legacy DB (used by replication for now)
-	storage.DB.Clear()
-	
 	// Reset replication state
 	storage.Replication = &storage.ReplicationState{
 		Role:     "master",
