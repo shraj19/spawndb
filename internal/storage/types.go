@@ -2,6 +2,7 @@ package storage
 
 import (
 	"errors"
+	"net"
 )
 
 // --- Data Types ---
@@ -36,6 +37,23 @@ var (
 	ErrNotInt    = errors.New("value is not an integer or out of range")
 )
 
-// Note: TTLResult, StreamEntry, StreamWaiter, Client are defined in
-// storage.go and database.go. They will be consolidated here after
-// migration is complete.
+// --- Stream Types ---
+
+// StreamEntry represents a single entry in a stream.
+type StreamEntry struct {
+	ID     string            // e.g. "1697000000123-0"
+	Fields map[string]string // field-value pairs
+}
+
+// Stream represents a stream data structure.
+type Stream struct {
+	Entries []StreamEntry      // ordered entries
+	Index   map[string]int     // ID → position in slice, for fast lookup
+}
+
+// StreamWaiter represents a client waiting for stream data.
+type StreamWaiter struct {
+	Conn      net.Conn
+	Done      chan struct{}
+	StreamIDs map[string]string // stream key -> last ID seen
+}

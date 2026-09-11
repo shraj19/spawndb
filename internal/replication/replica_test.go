@@ -5,7 +5,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -15,24 +14,23 @@ import (
 )
 
 func TestStartReplicaAppliesPropagatedSET(t *testing.T) {
+	// Clear legacy DB (used by replication for now)
 	storage.DB.Clear()
-	storage.Store = make(map[string]string)
-	storage.Expiry = make(map[string]time.Time)
-	storage.Lists = make(map[string]any)
-	storage.Streams = make(map[string]*storage.Stream)
-	storage.StreamWaiters = make(map[string][]*storage.StreamWaiter)
-	storage.Waiters = make(map[string][]chan [2]string)
-	storage.Mu = sync.RWMutex{}
+	
+	// Reset replication state
 	storage.Replication = &storage.ReplicationState{
 		Role:     "master",
 		ReplID:   "test-repl-id",
 		Offset:   0,
 		Replicas: make(map[string]*storage.ReplicaConnection),
 	}
+	
+	// Create DataStore and initialize commands with factories
+	db := storage.NewDataStore()
 	storage.InitCommands(map[string]storage.CommandHandler{
 		"PING":     commands.PING,
-		"SET":      commands.SETvalue,
-		"GET":      commands.GETvalue,
+		"SET":      commands.MakeSET(db),
+		"GET":      commands.MakeGET(db),
 		"REPLCONF": commands.REPLCONF,
 		"PSYNC":    commands.PSYNC,
 		"WAIT":     commands.WAIT,
@@ -92,14 +90,15 @@ func TestStartReplicaAppliesPropagatedSET(t *testing.T) {
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		v, ok := storage.DB.Get("replicated")
+		// Check the DataStore, not the legacy DB
+		v, ok := db.Strings().Get("replicated")
 		if ok && v == "value" {
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	v, ok := storage.DB.Get("replicated")
+	v, ok := db.Strings().Get("replicated")
 	if !ok || v != "value" {
 		t.Fatalf("expected replica to apply replicated SET, got key=%q value=%q present=%v", "replicated", v, ok)
 	}

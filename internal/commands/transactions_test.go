@@ -7,7 +7,6 @@ import (
 )
 
 func TestMULTIEXECQueueAndRunCommands(t *testing.T) {
-	resetStorage()
 	client := &storage.Client{}
 
 	response := MULTI([]string{"MULTI"}, client)
@@ -22,7 +21,6 @@ func TestMULTIEXECQueueAndRunCommands(t *testing.T) {
 }
 
 func TestDISCARDResetsTransactionState(t *testing.T) {
-	resetStorage()
 	client := &storage.Client{}
 
 	MULTI([]string{"MULTI"}, client)
