@@ -113,11 +113,40 @@ type StreamStore interface {
 }
 
 // DataStore is the facade interface providing access to all stores.
+// It provides atomic operations that are protected by per-key locks.
 type DataStore interface {
+	// Store accessors (for direct access when needed)
 	Strings() StringStore
 	Lists() ListStore
 	Streams() StreamStore
 	Registry() Registry
+	KeyLock() *KeyLock
+
+	// --- Atomic String Operations ---
+	// These hold a per-key lock for the duration of the operation.
+
+	Set(key, value string) error
+	SetWithTTL(key, value string, ttl time.Duration) error
+	Get(key string) (string, bool)
+	IncrBy(key string, delta int64) (int64, error)
+
+	// --- Atomic List Operations ---
+
+	LPush(key string, values ...string) (int, error)
+	RPush(key string, values ...string) (int, error)
+	LPop(key string, count int) ([]string, error)
+	LRange(key string, start, stop int) ([]string, error)
+	LLen(key string) (int, error)
+	BLPop(keys []string, timeout time.Duration) (key, value string, ok bool)
+
+	// --- Atomic Stream Operations ---
+
+	XAdd(key, id string, fields map[string]string) (string, error)
+	XRange(key, start, end string) ([]StreamEntry, error)
+	XRead(keys []string, ids []string) (map[string][]StreamEntry, error)
+	XReadBlock(keys []string, ids []string, timeout time.Duration) (map[string][]StreamEntry, error)
+
+	// --- Atomic Key Operations ---
 
 	// Delete removes a key regardless of type.
 	Delete(key string) bool
