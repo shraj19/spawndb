@@ -11,6 +11,15 @@ type ReplicaConnection struct {
 	ListeningPort string
 	AckOffset     int64
 	Connected     bool
+	writeMu       sync.Mutex // Guards writes to Conn to prevent interleaving
+}
+
+// Write sends data to the replica connection with serialization.
+// Multiple goroutines can safely call Write concurrently.
+func (r *ReplicaConnection) Write(data []byte) (int, error) {
+	r.writeMu.Lock()
+	defer r.writeMu.Unlock()
+	return r.Conn.Write(data)
 }
 
 // ReplicationState holds master/replica state.

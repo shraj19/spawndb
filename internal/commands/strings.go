@@ -129,6 +129,8 @@ func MakeINCR(db storage.DataStore) core.CommandHandler {
 }
 
 // propagateToReplicas sends command to all connected replicas.
+// Uses ReplicaConnection.Write() which serializes writes per-replica
+// to prevent RESP framing corruption from concurrent writes.
 func propagateToReplicas(args []string) {
 	encoded, err := resp.EncodeCommand(args)
 	if err != nil {
@@ -140,7 +142,8 @@ func propagateToReplicas(args []string) {
 	repl.Mu.RLock()
 	for _, rep := range repl.Replicas {
 		if rep != nil && rep.Connected && rep.Conn != nil {
-			_, _ = rep.Conn.Write(encoded)
+			// Use serialized Write method to prevent byte interleaving
+			_, _ = rep.Write(encoded)
 		}
 	}
 	repl.Mu.RUnlock()

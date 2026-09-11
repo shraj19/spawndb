@@ -105,7 +105,8 @@ func WAIT(args []string, client *core.Client) string {
 			repl.Mu.RUnlock()
 			for _, rc := range conns {
 				if rc.Conn != nil {
-					_, _ = rc.Conn.Write(b)
+					// Use serialized Write method
+					_, _ = rc.Write(b)
 				}
 			}
 		}
