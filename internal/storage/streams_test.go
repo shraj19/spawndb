@@ -390,3 +390,59 @@ func TestStreamStore_Delete(t *testing.T) {
 		t.Error("should be removed from registry")
 	}
 }
+
+
+
+// --- XReadBlock Multi-Key Double-Close Test ---
+
+// TestStreamStore_XReadBlock_MultiKeyNoPanic tests that concurrent XADDs
+// on multiple streams don't cause a panic from double-closing the Done channel.
+// Bug: XREAD BLOCK on [a, b] registers one waiter on both streams.
+// If XADD a and XADD b happen concurrently, both call notifyWaiters which
+// used to call close(w.Done) twice → panic.
+func TestStreamStore_XReadBlock_MultiKeyNoPanic(t *testing.T) {
+	for iter := 0; iter < 20; iter++ {
+		store, _ := newStreamStoreWithDeps()
+
+		// Create streams first
+		store.XAdd("stream_a", "1-0", map[string]string{"init": "a"})
+		store.XAdd("stream_b", "1-0", map[string]string{"init": "b"})
+
+		// Start blocking reader on both streams
+		readerDone := make(chan struct{})
+		go func() {
+			defer close(readerDone)
+			// Block waiting for new entries after "1-0"
+			store.XReadBlock([]string{"stream_a", "stream_b"}, []string{"1-0", "1-0"}, 5*time.Second)
+		}()
+
+		// Give reader time to register waiters
+		time.Sleep(20 * time.Millisecond)
+
+		// Concurrent XADDs to both streams - this used to panic
+		addDone := make(chan struct{})
+		go func() {
+			defer close(addDone)
+			// Fire both nearly simultaneously
+			go store.XAdd("stream_a", "*", map[string]string{"f": "va"})
+			go store.XAdd("stream_b", "*", map[string]string{"f": "vb"})
+		}()
+
+		// Wait for adds with timeout (would hang if panic is caught by test runner)
+		select {
+		case <-addDone:
+			// Good - no panic
+		case <-time.After(1 * time.Second):
+			t.Fatalf("iteration %d: XADDs timed out (possible deadlock)", iter)
+		}
+
+		// Wait for reader to complete
+		select {
+		case <-readerDone:
+			// Good
+		case <-time.After(2 * time.Second):
+			t.Fatalf("iteration %d: reader timed out", iter)
+		}
+	}
+	// If we get here without panic, the fix works
+}

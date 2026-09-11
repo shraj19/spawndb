@@ -3,6 +3,7 @@ package storage
 import (
 	"errors"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -66,4 +67,5 @@ type StreamWaiter struct {
 	Conn      net.Conn
 	Done      chan struct{}
 	StreamIDs map[string]string // stream key -> last ID seen
+	closeOnce sync.Once         // Guards Done channel close to prevent double-close panic
 }

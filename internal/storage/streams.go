@@ -420,7 +420,18 @@ func (s *streamStore) notifyWaiters(streamKey, newID string) {
 	var remaining []*StreamWaiter
 	for _, w := range waiters {
 		if s.compareIDs(newID, w.StreamIDs[streamKey]) > 0 {
-			close(w.Done)
+			// Use closeOnce to prevent double-close panic when waiter
+			// is registered on multiple keys and both get XADDs concurrently
+			w.closeOnce.Do(func() {
+				close(w.Done)
+			})
+			// Remove waiter from ALL keys it's registered on, not just this one.
+			// This prevents the same waiter being notified twice.
+			for key := range w.StreamIDs {
+				if key != streamKey { // Current key handled below
+					s.removeWaiterFromKey(key, w)
+				}
+			}
 		} else {
 			remaining = append(remaining, w)
 		}
