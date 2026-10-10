@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"fmt"
+	"log/slog"
 	"sync/atomic"
 	"time"
 )
@@ -37,15 +37,19 @@ func GetTotalCommands() int64 {
 	return atomic.LoadInt64(&TotalCommands)
 }
 
-// StartMetricsLogger prints metrics every 10 seconds
+// StartMetricsLogger logs metrics as structured JSON every 10 seconds.
+// JSON lines on stdout are picked up by the Docker log driver / promtail
+// and shipped to Loki.
 func StartMetricsLogger() {
 	ticker := time.NewTicker(10 * time.Second)
 	go func() {
 		for range ticker.C {
 			clients := GetConnectedClients()
 			commands := GetTotalCommands()
-			fmt.Printf("[INFO] Connected Clients: %d | Total Commands: %d\n",
-				clients, commands)
+			slog.Info("metrics snapshot",
+				"connected_clients", clients,
+				"total_commands", commands,
+			)
 		}
 	}()
 }

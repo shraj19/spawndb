@@ -1,0 +1,34 @@
+# Promtail configuration for FlashDB local development
+# Scrapes Docker container logs and pushes to Loki
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Extract container name as label
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # Extract compose service name
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        target_label: 'service'
+      # Add db label for flashdb/redis distinction
+      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
+        regex: '(flashdb|redis)'
+        target_label: 'db'
+      # Drop promtail's own logs to avoid noise
+      - source_labels: ['__meta_docker_container_name']
+        regex: '.*promtail.*'
+        action: drop

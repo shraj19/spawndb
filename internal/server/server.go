@@ -1,25 +1,43 @@
 package server
 
 import (
-	"bufio"
-	"fmt"
 	"io"
+	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"strings"
+	"time"
+
+	"bufio"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/shraj19/flashdb/internal/commands"
 	"github.com/shraj19/flashdb/internal/core"
+	"github.com/shraj19/flashdb/internal/metrics"
 	"github.com/shraj19/flashdb/internal/replication"
 	"github.com/shraj19/flashdb/internal/resp"
 	"github.com/shraj19/flashdb/internal/storage"
 )
 
-// HandleConnection handles one client connection
+// logger is a structured JSON logger. JSON lines on stdout are picked up by
+// the Docker log driver / promtail and shipped to Loki.
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+	Level: slog.LevelInfo,
+}))
+
+// HandleConnection handles one client connection.
 func HandleConnection(conn net.Conn) {
 	defer conn.Close()
 	storage.IncrementClients()
-	defer storage.DecrementClients()
+	metrics.ConnectedClients.Inc()
+	defer func() {
+		storage.DecrementClients()
+		metrics.ConnectedClients.Dec()
+	}()
+
 	// Use Client for per-connection state
 	client := &core.Client{Conn: conn}
 	reader := bufio.NewReader(conn)
@@ -31,7 +49,8 @@ func HandleConnection(conn net.Conn) {
 		}
 
 		if err != nil {
-			fmt.Println("Parse error:", err)
+			metrics.ErrorsTotal.WithLabelValues("parse").Inc()
+			logger.Error("parse error", "err", err.Error(), "remote", conn.RemoteAddr().String())
 			return
 		}
 
@@ -44,7 +63,9 @@ func HandleConnection(conn net.Conn) {
 
 		handler, ok := core.CommandMap[cmdName]
 		if !ok {
-			client.Conn.Write([]byte(resp.Error(fmt.Sprintf("unknown command '%s'", args[0]))))
+			metrics.ErrorsTotal.WithLabelValues("unknown_command").Inc()
+			metrics.CommandsTotal.WithLabelValues("unknown", "error").Inc()
+			client.Conn.Write([]byte(resp.Error("unknown command '" + args[0] + "'")))
 			continue
 		}
 
@@ -62,25 +83,68 @@ func HandleConnection(conn net.Conn) {
 			continue
 		}
 
-		// Execute the command normally
+		// Execute the command normally, timing it for metrics.
+		start := time.Now()
 		response := handler(args, client)
+		isError := strings.HasPrefix(response, "-")
+		metrics.ObserveCommand(cmdName, start, isError)
+
 		if response != "" {
 			client.Conn.Write([]byte(response))
 		}
 	}
 }
 
-// StartServer starts the Redis-like server
+// startMetricsEndpoint serves Prometheus metrics on the given address.
+// It runs in its own goroutine on a port separate from the RESP server so
+// scraping never competes with client traffic on the data port.
+func startMetricsEndpoint(addr string) {
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
+
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      mux,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	go func() {
+		logger.Info("metrics endpoint listening", "addr", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("metrics endpoint failed", "err", err.Error())
+		}
+	}()
+}
+
+// startKeysSampler periodically samples the total key count into the gauge.
+func startKeysSampler(db storage.DataStore) {
+	ticker := time.NewTicker(5 * time.Second)
+	go func() {
+		for range ticker.C {
+			metrics.KeysTotal.Set(float64(db.KeyCount()))
+		}
+	}()
+}
+
+// StartServer starts the Redis-like server.
 func StartServer() {
+	// Register Prometheus metrics against the default registry.
+	metrics.Register(prometheus.DefaultRegisterer)
+
 	// Create the DataStore - this is the composition root
 	db := storage.NewDataStore()
 
 	// Initialize commands with DataStore-based handlers
 	core.InitCommands(map[string]core.CommandHandler{
 		// General commands (stateless)
-		"PING":     commands.PING,
-		"ECHO":     commands.ECHO,
-		"INFO":     commands.INFO,
+		"PING": commands.PING,
+		"ECHO": commands.ECHO,
+		"INFO": commands.INFO,
 
 		// String commands (use DataStore)
 		"SET":  commands.MakeSET(db),
@@ -113,6 +177,7 @@ func StartServer() {
 	})
 
 	port := "6379"
+	metricsPort := "9121"
 	replicaHost := ""
 	replicaPort := ""
 	for i := 1; i < len(os.Args); i++ {
@@ -120,6 +185,11 @@ func StartServer() {
 		case "--port":
 			if i+1 < len(os.Args) {
 				port = os.Args[i+1]
+				i++
+			}
+		case "--metrics-port":
+			if i+1 < len(os.Args) {
+				metricsPort = os.Args[i+1]
 				i++
 			}
 		case "--replicaof":
@@ -138,23 +208,26 @@ func StartServer() {
 		}()
 		go replication.StartReplica(replicaHost, replicaPort, port)
 	}
+
 	storage.StartMetricsLogger()
+	startKeysSampler(db)
+	startMetricsEndpoint("0.0.0.0:" + metricsPort)
 
 	addr := "0.0.0.0:" + port
 
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		fmt.Printf("Failed to bind to port %s: %v\n", port, err)
+		logger.Error("failed to bind", "port", port, "err", err.Error())
 		return
 	}
 	defer listener.Close()
 
-	fmt.Printf("Server listening on %s\n", addr)
+	logger.Info("server listening", "addr", addr, "metrics_addr", "0.0.0.0:"+metricsPort)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			fmt.Println("Error accepting connection:", err)
+			logger.Error("error accepting connection", "err", err.Error())
 			continue
 		}
 

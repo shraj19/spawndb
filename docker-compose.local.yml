@@ -1,0 +1,128 @@
+# FlashDB local development + benchmarking stack
+#
+# Run with: docker-compose -f docker-compose.local.yml up
+#
+# Services:
+#   - flashdb:        FlashDB server (builds from source)
+#   - redis:          Real Redis (baseline for comparison)
+#   - redis_exporter: Prometheus exporter for Redis metrics
+#   - prometheus:     Metrics collection (scrapes flashdb + redis_exporter)
+#   - loki:           Log aggregation
+#   - promtail:       Log shipper (Docker container logs → Loki)
+#   - grafana:        Dashboards (localhost:3000, admin/admin)
+#
+# Ports:
+#   - 6379: FlashDB (RESP)
+#   - 6380: Redis (RESP)
+#   - 9121: FlashDB metrics
+#   - 9122: Redis exporter metrics
+#   - 9090: Prometheus UI
+#   - 3100: Loki API
+#   - 3000: Grafana UI
+
+services:
+  # ─────────────────────────────────────────────────────────────────
+  # Database targets (what we're benchmarking)
+  # ─────────────────────────────────────────────────────────────────
+
+  flashdb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "6379:6379"
+      - "9121:9121"
+    command: ["--port", "6379", "--metrics-port", "9121"]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "6379"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  redis_exporter:
+    image: oliver006/redis_exporter:latest
+    ports:
+      - "9122:9121"
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    command:
+      - "--web.listen-address=:9121"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────────────────────────
+  # Monitoring stack
+  # ─────────────────────────────────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
+    depends_on:
+      - flashdb
+      - redis_exporter
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:latest
+    volumes:
+      - ./promtail.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  loki-data:
+  grafana-data:

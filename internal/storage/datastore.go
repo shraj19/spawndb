@@ -193,3 +193,12 @@ func (d *dataStore) Exists(key string) bool {
 	_, exists := d.registry.Type(key)
 	return exists
 }
+
+// KeyCount returns the total number of non-expired keys across all types.
+// It is a best-effort snapshot for metrics; it does not take per-key locks,
+// so the count may be approximate under heavy concurrent mutation.
+func (d *dataStore) KeyCount() int {
+	return len(d.registry.Keys(TypeString)) +
+		len(d.registry.Keys(TypeList)) +
+		len(d.registry.Keys(TypeStream))
+}

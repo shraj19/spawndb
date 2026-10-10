@@ -1,0 +1,341 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Compare FlashDB vs Redis performance during benchmark runs",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "code": { "language": "plaintext", "showLineNumbers": false },
+        "content": "# FlashDB vs Redis Benchmark Dashboard\nCompare throughput, latency, and resource usage between FlashDB and real Redis during load tests.",
+        "mode": "markdown"
+      },
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 2 },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "rate(flashdb_commands_total{status=\"ok\"}[1m])",
+          "legendFormat": "FlashDB - {{command}}",
+          "refId": "A"
+        }
+      ],
+      "title": "FlashDB - Commands/sec by Type",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 2 },
+      "id": 3,
+      "targets": [
+        {
+          "expr": "rate(redis_commands_processed_total[1m])",
+          "legendFormat": "Redis - total",
+          "refId": "A"
+        }
+      ],
+      "title": "Redis - Commands/sec (from redis_exporter)",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 8 },
+      "id": 4,
+      "targets": [
+        {
+          "expr": "sum(rate(flashdb_commands_total{status=\"ok\"}[1m]))",
+          "legendFormat": "FlashDB",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(redis_commands_processed_total[1m])",
+          "legendFormat": "Redis",
+          "refId": "B"
+        }
+      ],
+      "title": "Total Throughput Comparison (ops/sec)",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 2
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "FlashDB" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Redis" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          }
+        ]
+      }
+    },
+    {
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 14 },
+      "id": 5,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(flashdb_command_duration_seconds_bucket[1m]))",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(flashdb_command_duration_seconds_bucket[1m]))",
+          "legendFormat": "p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(flashdb_command_duration_seconds_bucket[1m]))",
+          "legendFormat": "p99",
+          "refId": "C"
+        }
+      ],
+      "title": "FlashDB - Latency Percentiles",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 6, "w": 8, "x": 8, "y": 14 },
+      "id": 6,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(flashdb_command_duration_seconds_bucket[1m])) * 1000",
+          "legendFormat": "FlashDB p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(flashdb_command_duration_seconds_bucket[1m])) * 1000",
+          "legendFormat": "FlashDB p99",
+          "refId": "B"
+        },
+        {
+          "expr": "redis_latency_percentiles_usec_p50 / 1000",
+          "legendFormat": "Redis p50",
+          "refId": "C"
+        },
+        {
+          "expr": "redis_latency_percentiles_usec_p99 / 1000",
+          "legendFormat": "Redis p99",
+          "refId": "D"
+        }
+      ],
+      "title": "Latency Comparison (ms)",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 6, "w": 8, "x": 16, "y": 14 },
+      "id": 7,
+      "targets": [
+        {
+          "expr": "rate(flashdb_command_duration_seconds_sum[1m]) / rate(flashdb_command_duration_seconds_count[1m]) * 1000",
+          "legendFormat": "FlashDB avg",
+          "refId": "A"
+        }
+      ],
+      "title": "FlashDB - Average Latency (ms)",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 20 },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "flashdb_connected_clients",
+          "legendFormat": "FlashDB",
+          "refId": "A"
+        },
+        {
+          "expr": "redis_connected_clients",
+          "legendFormat": "Redis",
+          "refId": "B"
+        }
+      ],
+      "title": "Connected Clients",
+      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 20 },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "flashdb_keys_total",
+          "legendFormat": "FlashDB",
+          "refId": "A"
+        },
+        {
+          "expr": "redis_db_keys",
+          "legendFormat": "Redis",
+          "refId": "B"
+        }
+      ],
+      "title": "Total Keys",
+      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 20 },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "sum(rate(flashdb_commands_total{status=\"ok\"}[1m]))",
+          "legendFormat": "FlashDB",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(redis_commands_processed_total[1m])",
+          "legendFormat": "Redis",
+          "refId": "B"
+        }
+      ],
+      "title": "Current Throughput (ops/sec)",
+      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 20 },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "sum(rate(flashdb_errors_total[1m]))",
+          "legendFormat": "FlashDB errors",
+          "refId": "A"
+        }
+      ],
+      "title": "FlashDB Error Rate",
+      "type": "stat",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "rate(flashdb_errors_total[1m])",
+          "legendFormat": "{{type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "FlashDB - Errors by Type",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 24 },
+      "id": 13,
+      "targets": [
+        {
+          "expr": "rate(flashdb_commands_total[1m])",
+          "legendFormat": "{{command}} - {{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "FlashDB - Commands by Type and Status",
+      "type": "timeseries",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 30 },
+      "id": 14,
+      "options": {
+        "showLabels": false,
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service=\"flashdb\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "FlashDB Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["flashdb", "redis", "benchmark"],
+  "templating": { "list": [] },
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "FlashDB vs Redis Benchmark",
+  "uid": "flashdb-vs-redis",
+  "version": 1,
+  "weekStart": ""
+}

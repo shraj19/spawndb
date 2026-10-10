@@ -156,4 +156,8 @@ type DataStore interface {
 
 	// Exists returns true if key exists (any type).
 	Exists(key string) bool
+
+	// KeyCount returns the total number of currently stored keys across all types.
+	// Intended for metrics/observability sampling.
+	KeyCount() int
 }
