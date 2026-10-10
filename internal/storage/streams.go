@@ -21,19 +21,28 @@ var (
 
 // streamStore implements StreamStore interface.
 type streamStore struct {
-	data     map[string]*Stream
-	waiters  map[string][]*StreamWaiter
-	registry Registry
-	mu       sync.RWMutex
+	data      map[string]*Stream
+	waiterReg *waiterRegistry[*StreamWaiter]
+	registry  Registry
+	mu        sync.RWMutex
 }
 
 // NewStreamStore creates a new stream store.
 func NewStreamStore(registry Registry) StreamStore {
 	return &streamStore{
-		data:     make(map[string]*Stream),
-		waiters:  make(map[string][]*StreamWaiter),
-		registry: registry,
+		data:      make(map[string]*Stream),
+		waiterReg: newWaiterRegistry[*StreamWaiter](),
+		registry:  registry,
 	}
+}
+
+// streamWaiterKeys returns the keys a stream waiter is registered on.
+func streamWaiterKeys(w *StreamWaiter) []string {
+	keys := make([]string, 0, len(w.StreamIDs))
+	for k := range w.StreamIDs {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 func (s *streamStore) XAdd(key, inputID string, fields map[string]string) (string, error) {
@@ -151,8 +160,8 @@ func (s *streamStore) XReadBlock(keys, ids []string, timeout time.Duration) (map
 	}
 	for i, key := range keys {
 		waiter.StreamIDs[key] = resolvedIDs[i]
-		s.waiters[key] = append(s.waiters[key], waiter)
 	}
+	s.waiterReg.Add(keys, waiter)
 	s.mu.Unlock()
 
 	// Wait for notification or timeout
@@ -184,18 +193,14 @@ func (s *streamStore) RegisterWaiter(waiter *StreamWaiter) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for key := range waiter.StreamIDs {
-		s.waiters[key] = append(s.waiters[key], waiter)
-	}
+	s.waiterReg.Add(streamWaiterKeys(waiter), waiter)
 }
 
 func (s *streamStore) UnregisterWaiter(waiter *StreamWaiter) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for key := range waiter.StreamIDs {
-		s.removeWaiterFromKey(key, waiter)
-	}
+	s.waiterReg.RemoveFromKeys(streamWaiterKeys(waiter), waiter, "")
 }
 
 func (s *streamStore) Delete(key string) bool {
@@ -412,53 +417,20 @@ func (s *streamStore) queryStreams(keys, ids []string) (map[string][]StreamEntry
 }
 
 func (s *streamStore) notifyWaiters(streamKey, newID string) {
-	waiters, ok := s.waiters[streamKey]
-	if !ok {
-		return
-	}
-
-	var remaining []*StreamWaiter
-	for _, w := range waiters {
+	s.waiterReg.Range(streamKey, func(w *StreamWaiter) {
 		if s.compareIDs(newID, w.StreamIDs[streamKey]) > 0 {
-			// Use closeOnce to prevent double-close panic when waiter
-			// is registered on multiple keys and both get XADDs concurrently
+			// Use closeOnce to prevent double-close panic when a waiter is
+			// registered on multiple keys and both get XADDs concurrently.
 			w.closeOnce.Do(func() {
 				close(w.Done)
 			})
-			// Remove waiter from ALL keys it's registered on, not just this one.
-			// This prevents the same waiter being notified twice.
-			for key := range w.StreamIDs {
-				if key != streamKey { // Current key handled below
-					s.removeWaiterFromKey(key, w)
-				}
-			}
-		} else {
-			remaining = append(remaining, w)
+			// Remove this waiter from every key it is registered on (including
+			// streamKey). O(len(keys)), not O(all keys in the store).
+			s.waiterReg.RemoveFromKeys(streamWaiterKeys(w), w, "")
 		}
-	}
-
-	if len(remaining) == 0 {
-		delete(s.waiters, streamKey)
-	} else {
-		s.waiters[streamKey] = remaining
-	}
+	})
 }
 
 func (s *streamStore) unregisterWaiter(waiter *StreamWaiter, keys []string) {
-	for _, key := range keys {
-		s.removeWaiterFromKey(key, waiter)
-	}
-}
-
-func (s *streamStore) removeWaiterFromKey(key string, waiter *StreamWaiter) {
-	waiters := s.waiters[key]
-	for i, w := range waiters {
-		if w == waiter {
-			s.waiters[key] = append(waiters[:i], waiters[i+1:]...)
-			break
-		}
-	}
-	if len(s.waiters[key]) == 0 {
-		delete(s.waiters, key)
-	}
+	s.waiterReg.RemoveFromKeys(keys, waiter, "")
 }
