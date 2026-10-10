@@ -1,0 +1,813 @@
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0.59
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 65535
+# HELP process_network_receive_bytes_total Number of bytes received by the process over the network.
+# TYPE process_network_receive_bytes_total counter
+process_network_receive_bytes_total 1.650817e+06
+# HELP process_network_transmit_bytes_total Number of bytes sent by the process over the network.
+# TYPE process_network_transmit_bytes_total counter
+process_network_transmit_bytes_total 836265
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 10
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 1.8092032e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.79165576405e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.301024768e+09
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes 1.8446744073709552e+19
+# HELP redis_acl_access_denied_auth_total acl_access_denied_auth_total metric
+# TYPE redis_acl_access_denied_auth_total counter
+redis_acl_access_denied_auth_total 0
+# HELP redis_acl_access_denied_channel_total acl_access_denied_channel_total metric
+# TYPE redis_acl_access_denied_channel_total counter
+redis_acl_access_denied_channel_total 0
+# HELP redis_acl_access_denied_cmd_total acl_access_denied_cmd_total metric
+# TYPE redis_acl_access_denied_cmd_total counter
+redis_acl_access_denied_cmd_total 0
+# HELP redis_acl_access_denied_key_total acl_access_denied_key_total metric
+# TYPE redis_acl_access_denied_key_total counter
+redis_acl_access_denied_key_total 0
+# HELP redis_active_defrag_running active_defrag_running metric
+# TYPE redis_active_defrag_running gauge
+redis_active_defrag_running 0
+# HELP redis_allocator_active_bytes allocator_active_bytes metric
+# TYPE redis_allocator_active_bytes gauge
+redis_allocator_active_bytes 4.141056e+06
+# HELP redis_allocator_allocated_bytes allocator_allocated_bytes metric
+# TYPE redis_allocator_allocated_bytes gauge
+redis_allocator_allocated_bytes 3.729744e+06
+# HELP redis_allocator_frag_bytes allocator_frag_bytes metric
+# TYPE redis_allocator_frag_bytes gauge
+redis_allocator_frag_bytes 335280
+# HELP redis_allocator_frag_ratio allocator_frag_ratio metric
+# TYPE redis_allocator_frag_ratio gauge
+redis_allocator_frag_ratio 1.1
+# HELP redis_allocator_muzzy_bytes allocator_muzzy_bytes metric
+# TYPE redis_allocator_muzzy_bytes gauge
+redis_allocator_muzzy_bytes 0
+# HELP redis_allocator_resident_bytes allocator_resident_bytes metric
+# TYPE redis_allocator_resident_bytes gauge
+redis_allocator_resident_bytes 7.72096e+06
+# HELP redis_allocator_rss_bytes allocator_rss_bytes metric
+# TYPE redis_allocator_rss_bytes gauge
+redis_allocator_rss_bytes 3.579904e+06
+# HELP redis_allocator_rss_ratio allocator_rss_ratio metric
+# TYPE redis_allocator_rss_ratio gauge
+redis_allocator_rss_ratio 1.86
+# HELP redis_aof_current_rewrite_duration_sec aof_current_rewrite_duration_sec metric
+# TYPE redis_aof_current_rewrite_duration_sec gauge
+redis_aof_current_rewrite_duration_sec -1
+# HELP redis_aof_enabled aof_enabled metric
+# TYPE redis_aof_enabled gauge
+redis_aof_enabled 0
+# HELP redis_aof_last_bgrewrite_status aof_last_bgrewrite_status metric
+# TYPE redis_aof_last_bgrewrite_status gauge
+redis_aof_last_bgrewrite_status 1
+# HELP redis_aof_last_cow_size_bytes aof_last_cow_size_bytes metric
+# TYPE redis_aof_last_cow_size_bytes gauge
+redis_aof_last_cow_size_bytes 0
+# HELP redis_aof_last_rewrite_duration_sec aof_last_rewrite_duration_sec metric
+# TYPE redis_aof_last_rewrite_duration_sec gauge
+redis_aof_last_rewrite_duration_sec -1
+# HELP redis_aof_last_write_status aof_last_write_status metric
+# TYPE redis_aof_last_write_status gauge
+redis_aof_last_write_status 1
+# HELP redis_aof_rewrite_in_progress aof_rewrite_in_progress metric
+# TYPE redis_aof_rewrite_in_progress gauge
+redis_aof_rewrite_in_progress 0
+# HELP redis_aof_rewrite_scheduled aof_rewrite_scheduled metric
+# TYPE redis_aof_rewrite_scheduled gauge
+redis_aof_rewrite_scheduled 0
+# HELP redis_async_loading async_loading metric
+# TYPE redis_async_loading gauge
+redis_async_loading 0
+# HELP redis_blocked_clients blocked_clients metric
+# TYPE redis_blocked_clients gauge
+redis_blocked_clients 0
+# HELP redis_client_output_buffer_limit_disconnections_total client_output_buffer_limit_disconnections_total metric
+# TYPE redis_client_output_buffer_limit_disconnections_total counter
+redis_client_output_buffer_limit_disconnections_total 0
+# HELP redis_client_query_buffer_limit_disconnections_total client_query_buffer_limit_disconnections_total metric
+# TYPE redis_client_query_buffer_limit_disconnections_total counter
+redis_client_query_buffer_limit_disconnections_total 0
+# HELP redis_client_recent_max_input_buffer_bytes client_recent_max_input_buffer_bytes metric
+# TYPE redis_client_recent_max_input_buffer_bytes gauge
+redis_client_recent_max_input_buffer_bytes 20480
+# HELP redis_client_recent_max_output_buffer_bytes client_recent_max_output_buffer_bytes metric
+# TYPE redis_client_recent_max_output_buffer_bytes gauge
+redis_client_recent_max_output_buffer_bytes 0
+# HELP redis_clients_in_timeout_table clients_in_timeout_table metric
+# TYPE redis_clients_in_timeout_table gauge
+redis_clients_in_timeout_table 0
+# HELP redis_cluster_connections cluster_connections metric
+# TYPE redis_cluster_connections gauge
+redis_cluster_connections 0
+# HELP redis_cluster_enabled cluster_enabled metric
+# TYPE redis_cluster_enabled gauge
+redis_cluster_enabled 0
+# HELP redis_commands_duration_seconds_total Total amount of time in seconds spent per command
+# TYPE redis_commands_duration_seconds_total counter
+redis_commands_duration_seconds_total{cmd="client|setname"} 0.000386
+redis_commands_duration_seconds_total{cmd="command|info"} 0.00025
+redis_commands_duration_seconds_total{cmd="config|get"} 0.021929
+redis_commands_duration_seconds_total{cmd="get"} 0.127708
+redis_commands_duration_seconds_total{cmd="incr"} 0.08504
+redis_commands_duration_seconds_total{cmd="info"} 0.023841
+redis_commands_duration_seconds_total{cmd="latency|histogram"} 0.015973
+redis_commands_duration_seconds_total{cmd="latency|latest"} 0.000198
+redis_commands_duration_seconds_total{cmd="lpop"} 0.333163
+redis_commands_duration_seconds_total{cmd="lpush"} 0.897355
+redis_commands_duration_seconds_total{cmd="set"} 0.135866
+redis_commands_duration_seconds_total{cmd="slowlog|get"} 0.00011
+redis_commands_duration_seconds_total{cmd="slowlog|len"} 0.000104
+# HELP redis_commands_failed_calls_total Total number of errors prior command execution per command
+# TYPE redis_commands_failed_calls_total counter
+redis_commands_failed_calls_total{cmd="client|setname"} 0
+redis_commands_failed_calls_total{cmd="command|info"} 0
+redis_commands_failed_calls_total{cmd="config|get"} 0
+redis_commands_failed_calls_total{cmd="get"} 0
+redis_commands_failed_calls_total{cmd="incr"} 0
+redis_commands_failed_calls_total{cmd="info"} 0
+redis_commands_failed_calls_total{cmd="latency|histogram"} 0
+redis_commands_failed_calls_total{cmd="latency|latest"} 0
+redis_commands_failed_calls_total{cmd="lpop"} 0
+redis_commands_failed_calls_total{cmd="lpush"} 0
+redis_commands_failed_calls_total{cmd="set"} 0
+redis_commands_failed_calls_total{cmd="slowlog|get"} 0
+redis_commands_failed_calls_total{cmd="slowlog|len"} 0
+# HELP redis_commands_latencies_usec A histogram of latencies per command
+# TYPE redis_commands_latencies_usec histogram
+redis_commands_latencies_usec_bucket{cmd="client|setname",le="2"} 1
+redis_commands_latencies_usec_bucket{cmd="client|setname",le="4"} 87
+redis_commands_latencies_usec_bucket{cmd="client|setname",le="8"} 96
+redis_commands_latencies_usec_bucket{cmd="client|setname",le="16"} 98
+redis_commands_latencies_usec_bucket{cmd="client|setname",le="+Inf"} 98
+redis_commands_latencies_usec_sum{cmd="client|setname"} 386
+redis_commands_latencies_usec_count{cmd="client|setname"} 98
+redis_commands_latencies_usec_bucket{cmd="command|info",le="1"} 2
+redis_commands_latencies_usec_bucket{cmd="command|info",le="2"} 67
+redis_commands_latencies_usec_bucket{cmd="command|info",le="4"} 94
+redis_commands_latencies_usec_bucket{cmd="command|info",le="16"} 97
+redis_commands_latencies_usec_bucket{cmd="command|info",le="+Inf"} 97
+redis_commands_latencies_usec_sum{cmd="command|info"} 250
+redis_commands_latencies_usec_count{cmd="command|info"} 97
+redis_commands_latencies_usec_bucket{cmd="config|get",le="2"} 3
+redis_commands_latencies_usec_bucket{cmd="config|get",le="4"} 4
+redis_commands_latencies_usec_bucket{cmd="config|get",le="16"} 8
+redis_commands_latencies_usec_bucket{cmd="config|get",le="264"} 103
+redis_commands_latencies_usec_bucket{cmd="config|get",le="528"} 106
+redis_commands_latencies_usec_bucket{cmd="config|get",le="+Inf"} 106
+redis_commands_latencies_usec_sum{cmd="config|get"} 21929
+redis_commands_latencies_usec_count{cmd="config|get"} 106
+redis_commands_latencies_usec_bucket{cmd="get",le="1"} 399107
+redis_commands_latencies_usec_bucket{cmd="get",le="2"} 399552
+redis_commands_latencies_usec_bucket{cmd="get",le="4"} 399640
+redis_commands_latencies_usec_bucket{cmd="get",le="8"} 399717
+redis_commands_latencies_usec_bucket{cmd="get",le="16"} 399846
+redis_commands_latencies_usec_bucket{cmd="get",le="33"} 399988
+redis_commands_latencies_usec_bucket{cmd="get",le="66"} 399999
+redis_commands_latencies_usec_bucket{cmd="get",le="132"} 400000
+redis_commands_latencies_usec_bucket{cmd="get",le="+Inf"} 400000
+redis_commands_latencies_usec_sum{cmd="get"} 127708
+redis_commands_latencies_usec_count{cmd="get"} 400000
+redis_commands_latencies_usec_bucket{cmd="incr",le="1"} 399199
+redis_commands_latencies_usec_bucket{cmd="incr",le="2"} 399514
+redis_commands_latencies_usec_bucket{cmd="incr",le="4"} 399599
+redis_commands_latencies_usec_bucket{cmd="incr",le="8"} 399665
+redis_commands_latencies_usec_bucket{cmd="incr",le="16"} 399825
+redis_commands_latencies_usec_bucket{cmd="incr",le="33"} 399989
+redis_commands_latencies_usec_bucket{cmd="incr",le="66"} 399999
+redis_commands_latencies_usec_bucket{cmd="incr",le="132"} 400000
+redis_commands_latencies_usec_bucket{cmd="incr",le="+Inf"} 400000
+redis_commands_latencies_usec_sum{cmd="incr"} 85040
+redis_commands_latencies_usec_count{cmd="incr"} 400000
+redis_commands_latencies_usec_bucket{cmd="info",le="264"} 78
+redis_commands_latencies_usec_bucket{cmd="info",le="528"} 98
+redis_commands_latencies_usec_bucket{cmd="info",le="+Inf"} 98
+redis_commands_latencies_usec_sum{cmd="info"} 23841
+redis_commands_latencies_usec_count{cmd="info"} 98
+redis_commands_latencies_usec_bucket{cmd="latency|histogram",le="132"} 21
+redis_commands_latencies_usec_bucket{cmd="latency|histogram",le="264"} 96
+redis_commands_latencies_usec_bucket{cmd="latency|histogram",le="528"} 97
+redis_commands_latencies_usec_bucket{cmd="latency|histogram",le="+Inf"} 97
+redis_commands_latencies_usec_sum{cmd="latency|histogram"} 15973
+redis_commands_latencies_usec_count{cmd="latency|histogram"} 97
+redis_commands_latencies_usec_bucket{cmd="latency|latest",le="1"} 10
+redis_commands_latencies_usec_bucket{cmd="latency|latest",le="2"} 87
+redis_commands_latencies_usec_bucket{cmd="latency|latest",le="4"} 97
+redis_commands_latencies_usec_bucket{cmd="latency|latest",le="8"} 98
+redis_commands_latencies_usec_bucket{cmd="latency|latest",le="+Inf"} 98
+redis_commands_latencies_usec_sum{cmd="latency|latest"} 198
+redis_commands_latencies_usec_count{cmd="latency|latest"} 98
+redis_commands_latencies_usec_bucket{cmd="lpop",le="1"} 382515
+redis_commands_latencies_usec_bucket{cmd="lpop",le="2"} 397564
+redis_commands_latencies_usec_bucket{cmd="lpop",le="4"} 398190
+redis_commands_latencies_usec_bucket{cmd="lpop",le="8"} 398461
+redis_commands_latencies_usec_bucket{cmd="lpop",le="16"} 399242
+redis_commands_latencies_usec_bucket{cmd="lpop",le="33"} 399969
+redis_commands_latencies_usec_bucket{cmd="lpop",le="66"} 399997
+redis_commands_latencies_usec_bucket{cmd="lpop",le="132"} 400000
+redis_commands_latencies_usec_bucket{cmd="lpop",le="+Inf"} 400000
+redis_commands_latencies_usec_sum{cmd="lpop"} 333163
+redis_commands_latencies_usec_count{cmd="lpop"} 400000
+redis_commands_latencies_usec_bucket{cmd="lpush",le="1"} 146778
+redis_commands_latencies_usec_bucket{cmd="lpush",le="2"} 265640
+redis_commands_latencies_usec_bucket{cmd="lpush",le="4"} 364486
+redis_commands_latencies_usec_bucket{cmd="lpush",le="8"} 398633
+redis_commands_latencies_usec_bucket{cmd="lpush",le="16"} 399275
+redis_commands_latencies_usec_bucket{cmd="lpush",le="33"} 399933
+redis_commands_latencies_usec_bucket{cmd="lpush",le="66"} 400000
+redis_commands_latencies_usec_bucket{cmd="lpush",le="+Inf"} 400000
+redis_commands_latencies_usec_sum{cmd="lpush"} 897355
+redis_commands_latencies_usec_count{cmd="lpush"} 400000
+redis_commands_latencies_usec_bucket{cmd="set",le="1"} 398754
+redis_commands_latencies_usec_bucket{cmd="set",le="2"} 399539
+redis_commands_latencies_usec_bucket{cmd="set",le="4"} 399632
+redis_commands_latencies_usec_bucket{cmd="set",le="8"} 399739
+redis_commands_latencies_usec_bucket{cmd="set",le="16"} 399895
+redis_commands_latencies_usec_bucket{cmd="set",le="33"} 399993
+redis_commands_latencies_usec_bucket{cmd="set",le="66"} 400000
+redis_commands_latencies_usec_bucket{cmd="set",le="+Inf"} 400000
+redis_commands_latencies_usec_sum{cmd="set"} 135866
+redis_commands_latencies_usec_count{cmd="set"} 400000
+redis_commands_latencies_usec_bucket{cmd="slowlog|get",le="1"} 92
+redis_commands_latencies_usec_bucket{cmd="slowlog|get",le="2"} 94
+redis_commands_latencies_usec_bucket{cmd="slowlog|get",le="4"} 95
+redis_commands_latencies_usec_bucket{cmd="slowlog|get",le="16"} 97
+redis_commands_latencies_usec_bucket{cmd="slowlog|get",le="+Inf"} 97
+redis_commands_latencies_usec_sum{cmd="slowlog|get"} 110
+redis_commands_latencies_usec_count{cmd="slowlog|get"} 97
+redis_commands_latencies_usec_bucket{cmd="slowlog|len",le="1"} 91
+redis_commands_latencies_usec_bucket{cmd="slowlog|len",le="2"} 96
+redis_commands_latencies_usec_bucket{cmd="slowlog|len",le="16"} 97
+redis_commands_latencies_usec_bucket{cmd="slowlog|len",le="+Inf"} 97
+redis_commands_latencies_usec_sum{cmd="slowlog|len"} 104
+redis_commands_latencies_usec_count{cmd="slowlog|len"} 97
+# HELP redis_commands_processed_total commands_processed_total metric
+# TYPE redis_commands_processed_total counter
+redis_commands_processed_total 2.000785e+06
+# HELP redis_commands_rejected_calls_total Total number of errors within command execution per command
+# TYPE redis_commands_rejected_calls_total counter
+redis_commands_rejected_calls_total{cmd="client|setname"} 0
+redis_commands_rejected_calls_total{cmd="command|info"} 0
+redis_commands_rejected_calls_total{cmd="config|get"} 0
+redis_commands_rejected_calls_total{cmd="get"} 0
+redis_commands_rejected_calls_total{cmd="incr"} 0
+redis_commands_rejected_calls_total{cmd="info"} 0
+redis_commands_rejected_calls_total{cmd="latency|histogram"} 0
+redis_commands_rejected_calls_total{cmd="latency|latest"} 0
+redis_commands_rejected_calls_total{cmd="lpop"} 0
+redis_commands_rejected_calls_total{cmd="lpush"} 0
+redis_commands_rejected_calls_total{cmd="set"} 0
+redis_commands_rejected_calls_total{cmd="slowlog|get"} 0
+redis_commands_rejected_calls_total{cmd="slowlog|len"} 0
+# HELP redis_commands_total Total number of calls per command
+# TYPE redis_commands_total counter
+redis_commands_total{cmd="client|setname"} 98
+redis_commands_total{cmd="command|info"} 97
+redis_commands_total{cmd="config|get"} 105
+redis_commands_total{cmd="get"} 400000
+redis_commands_total{cmd="incr"} 400000
+redis_commands_total{cmd="info"} 97
+redis_commands_total{cmd="latency|histogram"} 97
+redis_commands_total{cmd="latency|latest"} 97
+redis_commands_total{cmd="lpop"} 400000
+redis_commands_total{cmd="lpush"} 400000
+redis_commands_total{cmd="set"} 400000
+redis_commands_total{cmd="slowlog|get"} 97
+redis_commands_total{cmd="slowlog|len"} 97
+# HELP redis_config_client_output_buffer_limit_bytes The configured buffer limits per class
+# TYPE redis_config_client_output_buffer_limit_bytes gauge
+redis_config_client_output_buffer_limit_bytes{class="normal",limit="hard"} 0
+redis_config_client_output_buffer_limit_bytes{class="normal",limit="soft"} 0
+redis_config_client_output_buffer_limit_bytes{class="pubsub",limit="hard"} 3.3554432e+07
+redis_config_client_output_buffer_limit_bytes{class="pubsub",limit="soft"} 8.388608e+06
+redis_config_client_output_buffer_limit_bytes{class="slave",limit="hard"} 2.68435456e+08
+redis_config_client_output_buffer_limit_bytes{class="slave",limit="soft"} 6.7108864e+07
+# HELP redis_config_client_output_buffer_limit_overcome_seconds How long for buffer limits per class to be exceeded before replicas are dropped
+# TYPE redis_config_client_output_buffer_limit_overcome_seconds gauge
+redis_config_client_output_buffer_limit_overcome_seconds{class="normal",limit="soft"} 0
+redis_config_client_output_buffer_limit_overcome_seconds{class="pubsub",limit="soft"} 60
+redis_config_client_output_buffer_limit_overcome_seconds{class="slave",limit="soft"} 60
+# HELP redis_config_io_threads config_io_threads metric
+# TYPE redis_config_io_threads gauge
+redis_config_io_threads 1
+# HELP redis_config_maxclients config_maxclients metric
+# TYPE redis_config_maxclients gauge
+redis_config_maxclients 10000
+# HELP redis_config_maxmemory config_maxmemory metric
+# TYPE redis_config_maxmemory gauge
+redis_config_maxmemory 0
+# HELP redis_config_repl_backlog_size config_repl_backlog_size metric
+# TYPE redis_config_repl_backlog_size gauge
+redis_config_repl_backlog_size 1.048576e+06
+# HELP redis_configured_hz configured_hz metric
+# TYPE redis_configured_hz gauge
+redis_configured_hz 10
+# HELP redis_connected_clients connected_clients metric
+# TYPE redis_connected_clients gauge
+redis_connected_clients 1
+# HELP redis_connected_slaves connected_slaves metric
+# TYPE redis_connected_slaves gauge
+redis_connected_slaves 0
+# HELP redis_connections_received_total connections_received_total metric
+# TYPE redis_connections_received_total counter
+redis_connections_received_total 1102
+# HELP redis_cpu_sys_children_seconds_total cpu_sys_children_seconds_total metric
+# TYPE redis_cpu_sys_children_seconds_total counter
+redis_cpu_sys_children_seconds_total 0.004237
+# HELP redis_cpu_sys_main_thread_seconds_total cpu_sys_main_thread_seconds_total metric
+# TYPE redis_cpu_sys_main_thread_seconds_total counter
+redis_cpu_sys_main_thread_seconds_total 10.153417
+# HELP redis_cpu_sys_seconds_total cpu_sys_seconds_total metric
+# TYPE redis_cpu_sys_seconds_total counter
+redis_cpu_sys_seconds_total 10.153202
+# HELP redis_cpu_user_children_seconds_total cpu_user_children_seconds_total metric
+# TYPE redis_cpu_user_children_seconds_total counter
+redis_cpu_user_children_seconds_total 0.009504
+# HELP redis_cpu_user_main_thread_seconds_total cpu_user_main_thread_seconds_total metric
+# TYPE redis_cpu_user_main_thread_seconds_total counter
+redis_cpu_user_main_thread_seconds_total 6.050204
+# HELP redis_cpu_user_seconds_total cpu_user_seconds_total metric
+# TYPE redis_cpu_user_seconds_total counter
+redis_cpu_user_seconds_total 6.054605
+# HELP redis_current_eviction_exceeded_time_ms current_eviction_exceeded_time_ms metric
+# TYPE redis_current_eviction_exceeded_time_ms gauge
+redis_current_eviction_exceeded_time_ms 0
+# HELP redis_db_avg_ttl_seconds Avg TTL in seconds
+# TYPE redis_db_avg_ttl_seconds gauge
+redis_db_avg_ttl_seconds{db="db0"} 0
+# HELP redis_db_keys Total number of keys by DB
+# TYPE redis_db_keys gauge
+redis_db_keys{db="db0"} 2
+redis_db_keys{db="db1"} 0
+redis_db_keys{db="db10"} 0
+redis_db_keys{db="db11"} 0
+redis_db_keys{db="db12"} 0
+redis_db_keys{db="db13"} 0
+redis_db_keys{db="db14"} 0
+redis_db_keys{db="db15"} 0
+redis_db_keys{db="db2"} 0
+redis_db_keys{db="db3"} 0
+redis_db_keys{db="db4"} 0
+redis_db_keys{db="db5"} 0
+redis_db_keys{db="db6"} 0
+redis_db_keys{db="db7"} 0
+redis_db_keys{db="db8"} 0
+redis_db_keys{db="db9"} 0
+# HELP redis_db_keys_expiring Total number of expiring keys by DB
+# TYPE redis_db_keys_expiring gauge
+redis_db_keys_expiring{db="db0"} 0
+redis_db_keys_expiring{db="db1"} 0
+redis_db_keys_expiring{db="db10"} 0
+redis_db_keys_expiring{db="db11"} 0
+redis_db_keys_expiring{db="db12"} 0
+redis_db_keys_expiring{db="db13"} 0
+redis_db_keys_expiring{db="db14"} 0
+redis_db_keys_expiring{db="db15"} 0
+redis_db_keys_expiring{db="db2"} 0
+redis_db_keys_expiring{db="db3"} 0
+redis_db_keys_expiring{db="db4"} 0
+redis_db_keys_expiring{db="db5"} 0
+redis_db_keys_expiring{db="db6"} 0
+redis_db_keys_expiring{db="db7"} 0
+redis_db_keys_expiring{db="db8"} 0
+redis_db_keys_expiring{db="db9"} 0
+# HELP redis_db_keys_with_expiring_items Total number of keys with expiring items by DB
+# TYPE redis_db_keys_with_expiring_items gauge
+redis_db_keys_with_expiring_items{db="db0"} 0
+# HELP redis_defrag_hits defrag_hits metric
+# TYPE redis_defrag_hits gauge
+redis_defrag_hits 0
+# HELP redis_defrag_key_hits defrag_key_hits metric
+# TYPE redis_defrag_key_hits gauge
+redis_defrag_key_hits 0
+# HELP redis_defrag_key_misses defrag_key_misses metric
+# TYPE redis_defrag_key_misses gauge
+redis_defrag_key_misses 0
+# HELP redis_defrag_misses defrag_misses metric
+# TYPE redis_defrag_misses gauge
+redis_defrag_misses 0
+# HELP redis_dump_payload_sanitizations dump_payload_sanitizations metric
+# TYPE redis_dump_payload_sanitizations counter
+redis_dump_payload_sanitizations 0
+# HELP redis_eventloop_cycles_total eventloop_cycles_total metric
+# TYPE redis_eventloop_cycles_total counter
+redis_eventloop_cycles_total 100572
+# HELP redis_eventloop_duration_cmd_sum_usec_total eventloop_duration_cmd_sum_usec_total metric
+# TYPE redis_eventloop_duration_cmd_sum_usec_total counter
+redis_eventloop_duration_cmd_sum_usec_total 1.641923e+06
+# HELP redis_eventloop_duration_sum_usec_total eventloop_duration_sum_usec_total metric
+# TYPE redis_eventloop_duration_sum_usec_total counter
+redis_eventloop_duration_sum_usec_total 1.5627427e+07
+# HELP redis_evicted_clients_total evicted_clients_total metric
+# TYPE redis_evicted_clients_total counter
+redis_evicted_clients_total 0
+# HELP redis_evicted_keys_total evicted_keys_total metric
+# TYPE redis_evicted_keys_total counter
+redis_evicted_keys_total 0
+# HELP redis_evicted_scripts_total evicted_scripts_total metric
+# TYPE redis_evicted_scripts_total counter
+redis_evicted_scripts_total 0
+# HELP redis_eviction_exceeded_time_ms_total eviction_exceeded_time_ms_total metric
+# TYPE redis_eviction_exceeded_time_ms_total counter
+redis_eviction_exceeded_time_ms_total 0
+# HELP redis_expire_cycle_cpu_time_ms_total expire_cycle_cpu_time_ms_total metric
+# TYPE redis_expire_cycle_cpu_time_ms_total counter
+redis_expire_cycle_cpu_time_ms_total 16
+# HELP redis_expired_keys_total expired_keys_total metric
+# TYPE redis_expired_keys_total counter
+redis_expired_keys_total 0
+# HELP redis_expired_stale_percentage expired_stale_percentage metric
+# TYPE redis_expired_stale_percentage gauge
+redis_expired_stale_percentage 0
+# HELP redis_expired_subkeys_total expired_subkeys_total metric
+# TYPE redis_expired_subkeys_total counter
+redis_expired_subkeys_total 0
+# HELP redis_expired_time_cap_reached_total expired_time_cap_reached_total metric
+# TYPE redis_expired_time_cap_reached_total counter
+redis_expired_time_cap_reached_total 0
+# HELP redis_exporter_build_info redis exporter build_info
+# TYPE redis_exporter_build_info gauge
+redis_exporter_build_info{build_date="",commit_sha="589a1cd930d62ba449a5207179ab44252e359c66",golang_version="go1.27.1",version="v1.93.0"} 1
+# HELP redis_exporter_last_scrape_connect_time_seconds exporter_last_scrape_connect_time_seconds metric
+# TYPE redis_exporter_last_scrape_connect_time_seconds gauge
+redis_exporter_last_scrape_connect_time_seconds 0.000670068
+# HELP redis_exporter_last_scrape_duration_seconds exporter_last_scrape_duration_seconds metric
+# TYPE redis_exporter_last_scrape_duration_seconds gauge
+redis_exporter_last_scrape_duration_seconds 0.004600907
+# HELP redis_exporter_last_scrape_error The last scrape error status.
+# TYPE redis_exporter_last_scrape_error gauge
+redis_exporter_last_scrape_error{err=""} 0
+# HELP redis_exporter_scrape_duration_seconds Durations of scrapes by the exporter
+# TYPE redis_exporter_scrape_duration_seconds summary
+redis_exporter_scrape_duration_seconds_sum 0.4430976839999999
+redis_exporter_scrape_duration_seconds_count 98
+# HELP redis_exporter_scrapes_total Current total redis scrapes.
+# TYPE redis_exporter_scrapes_total counter
+redis_exporter_scrapes_total 98
+# HELP redis_hz hz metric
+# TYPE redis_hz gauge
+redis_hz 10
+# HELP redis_instance_info instance_info metric
+# TYPE redis_instance_info gauge
+redis_instance_info{master_replid="bd5bfc507bd4ed0f88586c5f79ed87657e12eddf",maxmemory_policy="noeviction",os="Linux 6.18.51-120.163.amzn2023.x86_64 x86_64",process_id="1",redis_build_id="40ff01a501d8e4b6",redis_mode="standalone",redis_version="7.4.11",role="master",run_id="3f369160885cdcde86d90e069113902d615d6a21",tcp_port="6379"} 1
+# HELP redis_instantaneous_eventloop_cycles_per_sec instantaneous_eventloop_cycles_per_sec metric
+# TYPE redis_instantaneous_eventloop_cycles_per_sec gauge
+redis_instantaneous_eventloop_cycles_per_sec 6557
+# HELP redis_instantaneous_eventloop_duration_usec instantaneous_eventloop_duration_usec metric
+# TYPE redis_instantaneous_eventloop_duration_usec gauge
+redis_instantaneous_eventloop_duration_usec 153
+# HELP redis_io_threaded_reads_processed io_threaded_reads_processed metric
+# TYPE redis_io_threaded_reads_processed counter
+redis_io_threaded_reads_processed 0
+# HELP redis_io_threaded_writes_processed io_threaded_writes_processed metric
+# TYPE redis_io_threaded_writes_processed counter
+redis_io_threaded_writes_processed 0
+# HELP redis_io_threads_active io_threads_active metric
+# TYPE redis_io_threads_active gauge
+redis_io_threads_active 0
+# HELP redis_keyspace_hits_total keyspace_hits_total metric
+# TYPE redis_keyspace_hits_total counter
+redis_keyspace_hits_total 400000
+# HELP redis_keyspace_misses_total keyspace_misses_total metric
+# TYPE redis_keyspace_misses_total counter
+redis_keyspace_misses_total 0
+# HELP redis_last_key_groups_scrape_duration_milliseconds Duration of the last key group metrics scrape in milliseconds
+# TYPE redis_last_key_groups_scrape_duration_milliseconds gauge
+redis_last_key_groups_scrape_duration_milliseconds 0
+# HELP redis_last_slow_execution_duration_seconds The amount of time needed for last slow execution, in seconds
+# TYPE redis_last_slow_execution_duration_seconds gauge
+redis_last_slow_execution_duration_seconds 0
+# HELP redis_latency_percentiles_usec A summary of latency percentile distribution per command
+# TYPE redis_latency_percentiles_usec summary
+redis_latency_percentiles_usec{cmd="client|setname",quantile="50"} 4.015
+redis_latency_percentiles_usec{cmd="client|setname",quantile="99"} 11.007
+redis_latency_percentiles_usec{cmd="client|setname",quantile="99.9"} 12.031
+redis_latency_percentiles_usec_sum{cmd="client|setname"} 386
+redis_latency_percentiles_usec_count{cmd="client|setname"} 98
+redis_latency_percentiles_usec{cmd="command|info",quantile="50"} 2.007
+redis_latency_percentiles_usec{cmd="command|info",quantile="99"} 11.007
+redis_latency_percentiles_usec{cmd="command|info",quantile="99.9"} 16.063
+redis_latency_percentiles_usec_sum{cmd="command|info"} 250
+redis_latency_percentiles_usec_count{cmd="command|info"} 97
+redis_latency_percentiles_usec{cmd="config|get",quantile="50"} 220.159
+redis_latency_percentiles_usec{cmd="config|get",quantile="99"} 268.287
+redis_latency_percentiles_usec{cmd="config|get",quantile="99.9"} 274.431
+redis_latency_percentiles_usec_sum{cmd="config|get"} 21929
+redis_latency_percentiles_usec_count{cmd="config|get"} 105
+redis_latency_percentiles_usec{cmd="get",quantile="50"} 0.001
+redis_latency_percentiles_usec{cmd="get",quantile="99"} 1.003
+redis_latency_percentiles_usec{cmd="get",quantile="99.9"} 4.015
+redis_latency_percentiles_usec_sum{cmd="get"} 127708
+redis_latency_percentiles_usec_count{cmd="get"} 400000
+redis_latency_percentiles_usec{cmd="incr",quantile="50"} 0.001
+redis_latency_percentiles_usec{cmd="incr",quantile="99"} 1.003
+redis_latency_percentiles_usec{cmd="incr",quantile="99.9"} 5.023
+redis_latency_percentiles_usec_sum{cmd="incr"} 85040
+redis_latency_percentiles_usec_count{cmd="incr"} 400000
+redis_latency_percentiles_usec{cmd="info",quantile="50"} 244.735
+redis_latency_percentiles_usec{cmd="info",quantile="99"} 346.111
+redis_latency_percentiles_usec{cmd="info",quantile="99.9"} 376.831
+redis_latency_percentiles_usec_sum{cmd="info"} 23841
+redis_latency_percentiles_usec_count{cmd="info"} 97
+redis_latency_percentiles_usec{cmd="latency|histogram",quantile="50"} 171.007
+redis_latency_percentiles_usec{cmd="latency|histogram",quantile="99"} 224.255
+redis_latency_percentiles_usec{cmd="latency|histogram",quantile="99.9"} 382.975
+redis_latency_percentiles_usec_sum{cmd="latency|histogram"} 15973
+redis_latency_percentiles_usec_count{cmd="latency|histogram"} 97
+redis_latency_percentiles_usec{cmd="latency|latest",quantile="50"} 2.007
+redis_latency_percentiles_usec{cmd="latency|latest",quantile="99"} 3.007
+redis_latency_percentiles_usec{cmd="latency|latest",quantile="99.9"} 5.023
+redis_latency_percentiles_usec_sum{cmd="latency|latest"} 198
+redis_latency_percentiles_usec_count{cmd="latency|latest"} 97
+redis_latency_percentiles_usec{cmd="lpop",quantile="50"} 1.003
+redis_latency_percentiles_usec{cmd="lpop",quantile="99"} 2.007
+redis_latency_percentiles_usec{cmd="lpop",quantile="99.9"} 23.039
+redis_latency_percentiles_usec_sum{cmd="lpop"} 333163
+redis_latency_percentiles_usec_count{cmd="lpop"} 400000
+redis_latency_percentiles_usec{cmd="lpush",quantile="50"} 2.007
+redis_latency_percentiles_usec{cmd="lpush",quantile="99"} 6.015
+redis_latency_percentiles_usec{cmd="lpush",quantile="99.9"} 24.063
+redis_latency_percentiles_usec_sum{cmd="lpush"} 897355
+redis_latency_percentiles_usec_count{cmd="lpush"} 400000
+redis_latency_percentiles_usec{cmd="set",quantile="50"} 0.001
+redis_latency_percentiles_usec{cmd="set",quantile="99"} 1.003
+redis_latency_percentiles_usec{cmd="set",quantile="99.9"} 4.015
+redis_latency_percentiles_usec_sum{cmd="set"} 135866
+redis_latency_percentiles_usec_count{cmd="set"} 400000
+redis_latency_percentiles_usec{cmd="slowlog|get",quantile="50"} 1.003
+redis_latency_percentiles_usec{cmd="slowlog|get",quantile="99"} 9.023
+redis_latency_percentiles_usec{cmd="slowlog|get",quantile="99.9"} 10.047
+redis_latency_percentiles_usec_sum{cmd="slowlog|get"} 110
+redis_latency_percentiles_usec_count{cmd="slowlog|get"} 97
+redis_latency_percentiles_usec{cmd="slowlog|len",quantile="50"} 1.003
+redis_latency_percentiles_usec{cmd="slowlog|len",quantile="99"} 2.007
+redis_latency_percentiles_usec{cmd="slowlog|len",quantile="99.9"} 10.047
+redis_latency_percentiles_usec_sum{cmd="slowlog|len"} 104
+redis_latency_percentiles_usec_count{cmd="slowlog|len"} 97
+# HELP redis_latest_fork_seconds latest_fork_seconds metric
+# TYPE redis_latest_fork_seconds gauge
+redis_latest_fork_seconds 0.000317
+# HELP redis_lazyfree_pending_objects lazyfree_pending_objects metric
+# TYPE redis_lazyfree_pending_objects gauge
+redis_lazyfree_pending_objects 0
+# HELP redis_lazyfreed_objects lazyfreed_objects metric
+# TYPE redis_lazyfreed_objects gauge
+redis_lazyfreed_objects 0
+# HELP redis_loading_dump_file loading_dump_file metric
+# TYPE redis_loading_dump_file gauge
+redis_loading_dump_file 0
+# HELP redis_master_repl_offset master_repl_offset metric
+# TYPE redis_master_repl_offset gauge
+redis_master_repl_offset 0
+# HELP redis_max_clients max_clients metric
+# TYPE redis_max_clients gauge
+redis_max_clients 10000
+# HELP redis_mem_aof_buffer_bytes mem_aof_buffer_bytes metric
+# TYPE redis_mem_aof_buffer_bytes gauge
+redis_mem_aof_buffer_bytes 0
+# HELP redis_mem_clients_normal mem_clients_normal metric
+# TYPE redis_mem_clients_normal gauge
+redis_mem_clients_normal 0
+# HELP redis_mem_clients_slaves mem_clients_slaves metric
+# TYPE redis_mem_clients_slaves gauge
+redis_mem_clients_slaves 0
+# HELP redis_mem_cluster_links_bytes mem_cluster_links_bytes metric
+# TYPE redis_mem_cluster_links_bytes gauge
+redis_mem_cluster_links_bytes 0
+# HELP redis_mem_fragmentation_bytes mem_fragmentation_bytes metric
+# TYPE redis_mem_fragmentation_bytes gauge
+redis_mem_fragmentation_bytes 7.44032e+06
+# HELP redis_mem_fragmentation_ratio mem_fragmentation_ratio metric
+# TYPE redis_mem_fragmentation_ratio gauge
+redis_mem_fragmentation_ratio 3.34
+# HELP redis_mem_not_counted_for_eviction_bytes mem_not_counted_for_eviction_bytes metric
+# TYPE redis_mem_not_counted_for_eviction_bytes gauge
+redis_mem_not_counted_for_eviction_bytes 0
+# HELP redis_mem_overhead_db_hashtable_rehashing_bytes mem_overhead_db_hashtable_rehashing_bytes metric
+# TYPE redis_mem_overhead_db_hashtable_rehashing_bytes gauge
+redis_mem_overhead_db_hashtable_rehashing_bytes 0
+# HELP redis_mem_replication_backlog_bytes mem_replication_backlog_bytes metric
+# TYPE redis_mem_replication_backlog_bytes gauge
+redis_mem_replication_backlog_bytes 0
+# HELP redis_mem_total_replication_buffers_bytes mem_total_replication_buffers_bytes metric
+# TYPE redis_mem_total_replication_buffers_bytes gauge
+redis_mem_total_replication_buffers_bytes 0
+# HELP redis_memory_max_bytes memory_max_bytes metric
+# TYPE redis_memory_max_bytes gauge
+redis_memory_max_bytes 0
+# HELP redis_memory_used_bytes memory_used_bytes metric
+# TYPE redis_memory_used_bytes gauge
+redis_memory_used_bytes 1.309736e+06
+# HELP redis_memory_used_dataset_bytes memory_used_dataset_bytes metric
+# TYPE redis_memory_used_dataset_bytes gauge
+redis_memory_used_dataset_bytes 360480
+# HELP redis_memory_used_functions_bytes memory_used_functions_bytes metric
+# TYPE redis_memory_used_functions_bytes gauge
+redis_memory_used_functions_bytes 192
+# HELP redis_memory_used_lua_bytes memory_used_lua_bytes metric
+# TYPE redis_memory_used_lua_bytes gauge
+redis_memory_used_lua_bytes 32768
+# HELP redis_memory_used_overhead_bytes memory_used_overhead_bytes metric
+# TYPE redis_memory_used_overhead_bytes gauge
+redis_memory_used_overhead_bytes 949256
+# HELP redis_memory_used_peak_bytes memory_used_peak_bytes metric
+# TYPE redis_memory_used_peak_bytes gauge
+redis_memory_used_peak_bytes 3.683248e+06
+# HELP redis_memory_used_rss_bytes memory_used_rss_bytes metric
+# TYPE redis_memory_used_rss_bytes gauge
+redis_memory_used_rss_bytes 1.0620928e+07
+# HELP redis_memory_used_scripts_bytes memory_used_scripts_bytes metric
+# TYPE redis_memory_used_scripts_bytes gauge
+redis_memory_used_scripts_bytes 192
+# HELP redis_memory_used_scripts_eval_bytes memory_used_scripts_eval_bytes metric
+# TYPE redis_memory_used_scripts_eval_bytes gauge
+redis_memory_used_scripts_eval_bytes 0
+# HELP redis_memory_used_startup_bytes memory_used_startup_bytes metric
+# TYPE redis_memory_used_startup_bytes gauge
+redis_memory_used_startup_bytes 948456
+# HELP redis_memory_used_vm_eval_bytes memory_used_vm_eval_bytes metric
+# TYPE redis_memory_used_vm_eval_bytes gauge
+redis_memory_used_vm_eval_bytes 32768
+# HELP redis_memory_used_vm_functions_bytes memory_used_vm_functions_bytes metric
+# TYPE redis_memory_used_vm_functions_bytes gauge
+redis_memory_used_vm_functions_bytes 33792
+# HELP redis_memory_used_vm_total memory_used_vm_total metric
+# TYPE redis_memory_used_vm_total gauge
+redis_memory_used_vm_total 66560
+# HELP redis_migrate_cached_sockets_total migrate_cached_sockets_total metric
+# TYPE redis_migrate_cached_sockets_total gauge
+redis_migrate_cached_sockets_total 0
+# HELP redis_module_fork_in_progress module_fork_in_progress metric
+# TYPE redis_module_fork_in_progress gauge
+redis_module_fork_in_progress 0
+# HELP redis_module_fork_last_cow_size module_fork_last_cow_size metric
+# TYPE redis_module_fork_last_cow_size gauge
+redis_module_fork_last_cow_size 0
+# HELP redis_net_input_bytes_total net_input_bytes_total metric
+# TYPE redis_net_input_bytes_total counter
+redis_net_input_bytes_total 7.3626474e+07
+# HELP redis_net_output_bytes_total net_output_bytes_total metric
+# TYPE redis_net_output_bytes_total counter
+redis_net_output_bytes_total 1.7383021e+07
+# HELP redis_net_repl_input_bytes_total net_repl_input_bytes_total metric
+# TYPE redis_net_repl_input_bytes_total counter
+redis_net_repl_input_bytes_total 0
+# HELP redis_net_repl_output_bytes_total net_repl_output_bytes_total metric
+# TYPE redis_net_repl_output_bytes_total counter
+redis_net_repl_output_bytes_total 0
+# HELP redis_number_of_cached_scripts number_of_cached_scripts metric
+# TYPE redis_number_of_cached_scripts gauge
+redis_number_of_cached_scripts 0
+# HELP redis_number_of_functions number_of_functions metric
+# TYPE redis_number_of_functions gauge
+redis_number_of_functions 0
+# HELP redis_number_of_libraries number_of_libraries metric
+# TYPE redis_number_of_libraries gauge
+redis_number_of_libraries 0
+# HELP redis_process_id process_id metric
+# TYPE redis_process_id gauge
+redis_process_id 1
+# HELP redis_pubsub_channels pubsub_channels metric
+# TYPE redis_pubsub_channels gauge
+redis_pubsub_channels 0
+# HELP redis_pubsub_clients pubsub_clients metric
+# TYPE redis_pubsub_clients gauge
+redis_pubsub_clients 0
+# HELP redis_pubsub_patterns pubsub_patterns metric
+# TYPE redis_pubsub_patterns gauge
+redis_pubsub_patterns 0
+# HELP redis_pubsubshard_channels pubsubshard_channels metric
+# TYPE redis_pubsubshard_channels gauge
+redis_pubsubshard_channels 0
+# HELP redis_rdb_bgsave_in_progress rdb_bgsave_in_progress metric
+# TYPE redis_rdb_bgsave_in_progress gauge
+redis_rdb_bgsave_in_progress 0
+# HELP redis_rdb_changes_since_last_save rdb_changes_since_last_save metric
+# TYPE redis_rdb_changes_since_last_save gauge
+redis_rdb_changes_since_last_save 400000
+# HELP redis_rdb_current_bgsave_duration_sec rdb_current_bgsave_duration_sec metric
+# TYPE redis_rdb_current_bgsave_duration_sec gauge
+redis_rdb_current_bgsave_duration_sec -1
+# HELP redis_rdb_last_bgsave_duration_sec rdb_last_bgsave_duration_sec metric
+# TYPE redis_rdb_last_bgsave_duration_sec gauge
+redis_rdb_last_bgsave_duration_sec 0
+# HELP redis_rdb_last_bgsave_status rdb_last_bgsave_status metric
+# TYPE redis_rdb_last_bgsave_status gauge
+redis_rdb_last_bgsave_status 1
+# HELP redis_rdb_last_cow_size_bytes rdb_last_cow_size_bytes metric
+# TYPE redis_rdb_last_cow_size_bytes gauge
+redis_rdb_last_cow_size_bytes 233472
+# HELP redis_rdb_last_load_expired_keys rdb_last_load_expired_keys metric
+# TYPE redis_rdb_last_load_expired_keys gauge
+redis_rdb_last_load_expired_keys 0
+# HELP redis_rdb_last_load_loaded_keys rdb_last_load_loaded_keys metric
+# TYPE redis_rdb_last_load_loaded_keys gauge
+redis_rdb_last_load_loaded_keys 0
+# HELP redis_rdb_last_save_timestamp_seconds rdb_last_save_timestamp_seconds metric
+# TYPE redis_rdb_last_save_timestamp_seconds gauge
+redis_rdb_last_save_timestamp_seconds 1.79165651e+09
+# HELP redis_rdb_saves_total rdb_saves_total metric
+# TYPE redis_rdb_saves_total gauge
+redis_rdb_saves_total 5
+# HELP redis_rejected_connections_total rejected_connections_total metric
+# TYPE redis_rejected_connections_total counter
+redis_rejected_connections_total 0
+# HELP redis_repl_backlog_first_byte_offset repl_backlog_first_byte_offset metric
+# TYPE redis_repl_backlog_first_byte_offset gauge
+redis_repl_backlog_first_byte_offset 0
+# HELP redis_repl_backlog_history_bytes repl_backlog_history_bytes metric
+# TYPE redis_repl_backlog_history_bytes gauge
+redis_repl_backlog_history_bytes 0
+# HELP redis_repl_backlog_is_active repl_backlog_is_active metric
+# TYPE redis_repl_backlog_is_active gauge
+redis_repl_backlog_is_active 0
+# HELP redis_replica_partial_resync_accepted replica_partial_resync_accepted metric
+# TYPE redis_replica_partial_resync_accepted gauge
+redis_replica_partial_resync_accepted 0
+# HELP redis_replica_partial_resync_denied replica_partial_resync_denied metric
+# TYPE redis_replica_partial_resync_denied gauge
+redis_replica_partial_resync_denied 0
+# HELP redis_replica_resyncs_full replica_resyncs_full metric
+# TYPE redis_replica_resyncs_full gauge
+redis_replica_resyncs_full 0
+# HELP redis_replication_backlog_bytes replication_backlog_bytes metric
+# TYPE redis_replication_backlog_bytes gauge
+redis_replication_backlog_bytes 1.048576e+06
+# HELP redis_reply_buffer_expands_total reply_buffer_expands_total metric
+# TYPE redis_reply_buffer_expands_total counter
+redis_reply_buffer_expands_total 0
+# HELP redis_reply_buffer_shrinks_total reply_buffer_shrinks_total metric
+# TYPE redis_reply_buffer_shrinks_total counter
+redis_reply_buffer_shrinks_total 0
+# HELP redis_second_repl_offset second_repl_offset metric
+# TYPE redis_second_repl_offset gauge
+redis_second_repl_offset -1
+# HELP redis_slave_expires_tracked_keys slave_expires_tracked_keys metric
+# TYPE redis_slave_expires_tracked_keys gauge
+redis_slave_expires_tracked_keys 0
+# HELP redis_slowlog_last_id Last id of slowlog
+# TYPE redis_slowlog_last_id gauge
+redis_slowlog_last_id 0
+# HELP redis_slowlog_length Total slowlog
+# TYPE redis_slowlog_length gauge
+redis_slowlog_length 0
+# HELP redis_start_time_seconds Start time of the Redis instance since unix epoch in seconds.
+# TYPE redis_start_time_seconds gauge
+redis_start_time_seconds 1.791655758e+09
+# HELP redis_target_scrape_request_errors_total Errors in requests to the exporter
+# TYPE redis_target_scrape_request_errors_total counter
+redis_target_scrape_request_errors_total 0
+# HELP redis_total_blocking_keys total_blocking_keys metric
+# TYPE redis_total_blocking_keys gauge
+redis_total_blocking_keys 0
+# HELP redis_total_blocking_keys_on_nokey total_blocking_keys_on_nokey metric
+# TYPE redis_total_blocking_keys_on_nokey gauge
+redis_total_blocking_keys_on_nokey 0
+# HELP redis_total_error_replies total_error_replies metric
+# TYPE redis_total_error_replies counter
+redis_total_error_replies 0
+# HELP redis_total_reads_processed total_reads_processed metric
+# TYPE redis_total_reads_processed counter
+redis_total_reads_processed 2.001883e+06
+# HELP redis_total_watched_keys total_watched_keys metric
+# TYPE redis_total_watched_keys gauge
+redis_total_watched_keys 0
+# HELP redis_total_writes_processed total_writes_processed metric
+# TYPE redis_total_writes_processed counter
+redis_total_writes_processed 2.000781e+06
+# HELP redis_tracking_clients tracking_clients metric
+# TYPE redis_tracking_clients gauge
+redis_tracking_clients 0
+# HELP redis_tracking_total_items tracking_total_items metric
+# TYPE redis_tracking_total_items gauge
+redis_tracking_total_items 0
+# HELP redis_tracking_total_keys tracking_total_keys metric
+# TYPE redis_tracking_total_keys gauge
+redis_tracking_total_keys 0
+# HELP redis_tracking_total_prefixes tracking_total_prefixes metric
+# TYPE redis_tracking_total_prefixes gauge
+redis_tracking_total_prefixes 0
+# HELP redis_unexpected_error_replies unexpected_error_replies metric
+# TYPE redis_unexpected_error_replies counter
+redis_unexpected_error_replies 0
+# HELP redis_up Information about the Redis instance
+# TYPE redis_up gauge
+redis_up 1
+# HELP redis_uptime_in_seconds uptime_in_seconds metric
+# TYPE redis_uptime_in_seconds gauge
+redis_uptime_in_seconds 786
+# HELP redis_watching_clients watching_clients metric
+# TYPE redis_watching_clients gauge
+redis_watching_clients 0

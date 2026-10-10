@@ -1,0 +1,9 @@
+{
+  run: 1,
+  timestamp: ",
+  requests: 100000,
+  clients: 50,
+  commands: [set, get, incr, lpush, lpop],
+  flashdb_host: 10.0.1.87,
+  redis_host: 10.0.1.73
+}
