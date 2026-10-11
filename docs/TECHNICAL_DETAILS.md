@@ -1,4 +1,4 @@
-# FlashDB - Technical Deep Dive
+# SpawnDB - Technical Deep Dive
 
 **Your Personal Reference Guide for Interviews & Future Development**
 
@@ -21,7 +21,7 @@
 
 ## Project Overview
 
-**FlashDB** is a lightweight, high-performance in-memory key-value database built in Go, implementing the RESP (Redis Serialization Protocol).
+**SpawnDB** is a lightweight, high-performance in-memory key-value database built in Go, implementing the RESP (Redis Serialization Protocol).
 
 **Why this project matters:**
 - Demonstrates low-level systems programming (TCP networking, protocol parsing)
@@ -793,7 +793,7 @@ XREAD block:   Depends on data arrival (can be seconds)
 ## Interview Talking Points
 
 ### Opening Statement (30 seconds)
-> "I built FlashDB, a high-performance in-memory key-value database in Go that implements the Redis protocol. It supports transactions, blocking operations, and stream processing, all with careful attention to concurrent access and clean architecture."
+> "I built SpawnDB, a high-performance in-memory key-value database in Go that implements the Redis protocol. It supports transactions, blocking operations, and stream processing, all with careful attention to concurrent access and clean architecture."
 
 ### Technical Depth (1-2 minutes)
 

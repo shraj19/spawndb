@@ -1,4 +1,4 @@
-# FlashDB vs Redis Benchmark Analysis
+# SpawnDB vs Redis Benchmark Analysis
 
 **Date:** 2026-10-10
 **Environment:** AWS us-east-1, 3x m7i-flex.large (2 vCPU, 8GB RAM each)
@@ -8,7 +8,7 @@
 ## Raw Results (3 runs)
 
 ### SET (requests/second)
-| Run | FlashDB | Redis | FlashDB/Redis |
+| Run | SpawnDB | Redis | SpawnDB/Redis |
 |-----|---------|-------|---------------|
 | 1 | 207,039 | 156,006 | 1.33x |
 | 2 | 207,039 | 155,280 | 1.33x |
@@ -16,7 +16,7 @@
 | **Avg** | **207,326** | **160,355** | **1.29x** |
 
 ### GET (requests/second)
-| Run | FlashDB | Redis | FlashDB/Redis |
+| Run | SpawnDB | Redis | SpawnDB/Redis |
 |-----|---------|-------|---------------|
 | 1 | 200,803 | 159,490 | 1.26x |
 | 2 | 208,333 | 166,667 | 1.25x |
@@ -24,7 +24,7 @@
 | **Avg** | **205,823** | **163,634** | **1.26x** |
 
 ### INCR (requests/second)
-| Run | FlashDB | Redis | FlashDB/Redis |
+| Run | SpawnDB | Redis | SpawnDB/Redis |
 |-----|---------|-------|---------------|
 | 1 | 194,932 | 172,712 | 1.13x |
 | 2 | 209,205 | 170,358 | 1.23x |
@@ -32,7 +32,7 @@
 | **Avg** | **204,012** | **168,645** | **1.21x** |
 
 ### LPUSH (requests/second) — THE BOTTLENECK
-| Run | FlashDB | Redis | FlashDB/Redis |
+| Run | SpawnDB | Redis | SpawnDB/Redis |
 |-----|---------|-------|---------------|
 | 1 | 1,556 | 128,205 | 0.012x |
 | 2 | 1,569 | 126,582 | 0.012x |
@@ -40,7 +40,7 @@
 | **Avg** | **1,554** | **128,388** | **0.012x (83x slower)** |
 
 ### LPOP (requests/second)
-| Run | FlashDB | Redis | FlashDB/Redis |
+| Run | SpawnDB | Redis | SpawnDB/Redis |
 |-----|---------|-------|---------------|
 | 1 | 211,864 | 159,490 | 1.33x |
 | 2 | 199,203 | 144,300 | 1.38x |
@@ -49,44 +49,44 @@
 
 ---
 
-## Critical Analysis: Why FlashDB *Appears* Faster (But Probably Isn't)
+## Critical Analysis: Why SpawnDB *Appears* Faster (But Probably Isn't)
 
 ### The Skeptical View (IMPORTANT)
 
-FlashDB showing 1.2-1.3x faster than Redis on simple operations is **suspicious** and likely due to **missing features**, not superior implementation. Here's why:
+SpawnDB showing 1.2-1.3x faster than Redis on simple operations is **suspicious** and likely due to **missing features**, not superior implementation. Here's why:
 
-#### 1. FlashDB Does Less Work Per Command
+#### 1. SpawnDB Does Less Work Per Command
 
-Redis does many things FlashDB doesn't:
+Redis does many things SpawnDB doesn't:
 - **Persistence (AOF/RDB):** Redis may be doing append-only file writes or snapshot preparation
 - **Replication:** Even idle, Redis tracks replication state
 - **Expire management:** Redis has sophisticated lazy + active expiration
 - **Memory management:** Redis has complex memory allocation strategies for different data types
 - **Client tracking:** Redis tracks per-client state, memory usage, etc.
 
-FlashDB's simpler implementation means less code runs per command = faster, but also **less functionality**.
+SpawnDB's simpler implementation means less code runs per command = faster, but also **less functionality**.
 
 #### 2. Network Topology Difference
 
-- FlashDB runs **natively** on EC2 (Go binary, single process)
+- SpawnDB runs **natively** on EC2 (Go binary, single process)
 - Redis runs **in Docker** (additional network hop through Docker bridge)
 
 This adds latency to every Redis operation. A fairer test would run both in Docker or both natively.
 
 #### 3. Latency Distribution Tells the Real Story
 
-| Command | FlashDB p50 | Redis p50 | FlashDB p99 | Redis p99 |
+| Command | SpawnDB p50 | Redis p50 | SpawnDB p99 | Redis p99 |
 |---------|-------------|-----------|-------------|-----------|
 | SET | 0.183ms | 0.287ms | 0.503ms | 0.471ms |
 | GET | 0.183ms | 0.271ms | 0.383ms | 0.487ms |
 | LPUSH | **30.9ms** | 0.359ms | **70.3ms** | 0.591ms |
 
-Notice: **p99 latencies are similar or Redis wins** — FlashDB's advantage disappears at the tail. LPUSH's 30-70ms latencies are catastrophic.
+Notice: **p99 latencies are similar or Redis wins** — SpawnDB's advantage disappears at the tail. LPUSH's 30-70ms latencies are catastrophic.
 
 #### 4. The Test Is Not Extensive Enough
 
 This benchmark tests:
-- ✅ Simple SET/GET/INCR (FlashDB is competitive)
+- ✅ Simple SET/GET/INCR (SpawnDB is competitive)
 - ✅ Basic LPUSH/LPOP (LPUSH has severe issues)
 - ❌ Concurrent access to same key
 - ❌ Large values (only 3 bytes tested)
@@ -124,7 +124,7 @@ This is a real bug worth investigating and fixing.
 ## Files in This Directory
 
 - `run-001/`, `run-002/`, `run-003/` — Three benchmark runs
-  - `flashdb.csv` — FlashDB benchmark results
+  - `SpawnDB.csv` — SpawnDB benchmark results
   - `redis.csv` — Redis benchmark results  
-  - `flashdb-metrics.txt` — Prometheus metrics snapshot
+  - `SpawnDB-metrics.txt` — Prometheus metrics snapshot
   - `redis-metrics.txt` — redis_exporter metrics snapshot
