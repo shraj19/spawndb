@@ -1,5 +1,7 @@
 # spawndb
 
+> **Note:** This project was formerly known as **FlashDB**. The rename reflects the concurrent "spawn goroutines" architecture.
+
 A high-performance, concurrent, in-memory key-value database written in Go. Implements the Redis Serialization Protocol (RESP) from scratch — compatible with `redis-cli` and Redis client libraries.
 
 ## Performance
