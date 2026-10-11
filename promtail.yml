@@ -1,4 +1,4 @@
-# Promtail configuration for FlashDB local development
+# Promtail configuration for spawndb local development
 # Scrapes Docker container logs and pushes to Loki
 
 server:
@@ -24,9 +24,9 @@ scrape_configs:
       # Extract compose service name
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
         target_label: 'service'
-      # Add db label for flashdb/redis distinction
+      # Add db label for spawndb/redis distinction
       - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
-        regex: '(flashdb|redis)'
+        regex: '(spawndb|redis)'
         target_label: 'db'
       # Drop promtail's own logs to avoid noise
       - source_labels: ['__meta_docker_container_name']

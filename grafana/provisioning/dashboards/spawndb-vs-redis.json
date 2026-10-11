@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Compare FlashDB vs Redis performance during benchmark runs",
+  "description": "Compare spawndb vs Redis performance during benchmark runs",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -15,7 +15,7 @@
       "id": 1,
       "options": {
         "code": { "language": "plaintext", "showLineNumbers": false },
-        "content": "# FlashDB vs Redis Benchmark Dashboard\nCompare throughput, latency, and resource usage between FlashDB and real Redis during load tests.",
+        "content": "# spawndb vs Redis Benchmark Dashboard\nCompare throughput, latency, and resource usage between spawndb and real Redis during load tests.",
         "mode": "markdown"
       },
       "title": "",
@@ -27,12 +27,12 @@
       "id": 2,
       "targets": [
         {
-          "expr": "rate(flashdb_commands_total{status=\"ok\"}[1m])",
-          "legendFormat": "FlashDB - {{command}}",
+          "expr": "rate(spawndb_commands_total{status=\"ok\"}[1m])",
+          "legendFormat": "spawndb - {{command}}",
           "refId": "A"
         }
       ],
-      "title": "FlashDB - Commands/sec by Type",
+      "title": "spawndb - Commands/sec by Type",
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {
@@ -63,8 +63,8 @@
       "id": 4,
       "targets": [
         {
-          "expr": "sum(rate(flashdb_commands_total{status=\"ok\"}[1m]))",
-          "legendFormat": "FlashDB",
+          "expr": "sum(rate(spawndb_commands_total{status=\"ok\"}[1m]))",
+          "legendFormat": "spawndb",
           "refId": "A"
         },
         {
@@ -84,7 +84,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "FlashDB" },
+            "matcher": { "id": "byName", "options": "spawndb" },
             "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
           },
           {
@@ -99,22 +99,22 @@
       "id": 5,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(flashdb_command_duration_seconds_bucket[1m]))",
+          "expr": "histogram_quantile(0.50, rate(spawndb_command_duration_seconds_bucket[1m]))",
           "legendFormat": "p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, rate(flashdb_command_duration_seconds_bucket[1m]))",
+          "expr": "histogram_quantile(0.95, rate(spawndb_command_duration_seconds_bucket[1m]))",
           "legendFormat": "p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(flashdb_command_duration_seconds_bucket[1m]))",
+          "expr": "histogram_quantile(0.99, rate(spawndb_command_duration_seconds_bucket[1m]))",
           "legendFormat": "p99",
           "refId": "C"
         }
       ],
-      "title": "FlashDB - Latency Percentiles",
+      "title": "spawndb - Latency Percentiles",
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {
@@ -127,13 +127,13 @@
       "id": 6,
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, rate(flashdb_command_duration_seconds_bucket[1m])) * 1000",
-          "legendFormat": "FlashDB p50",
+          "expr": "histogram_quantile(0.50, rate(spawndb_command_duration_seconds_bucket[1m])) * 1000",
+          "legendFormat": "spawndb p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.99, rate(flashdb_command_duration_seconds_bucket[1m])) * 1000",
-          "legendFormat": "FlashDB p99",
+          "expr": "histogram_quantile(0.99, rate(spawndb_command_duration_seconds_bucket[1m])) * 1000",
+          "legendFormat": "spawndb p99",
           "refId": "B"
         },
         {
@@ -160,12 +160,12 @@
       "id": 7,
       "targets": [
         {
-          "expr": "rate(flashdb_command_duration_seconds_sum[1m]) / rate(flashdb_command_duration_seconds_count[1m]) * 1000",
-          "legendFormat": "FlashDB avg",
+          "expr": "rate(spawndb_command_duration_seconds_sum[1m]) / rate(spawndb_command_duration_seconds_count[1m]) * 1000",
+          "legendFormat": "spawndb avg",
           "refId": "A"
         }
       ],
-      "title": "FlashDB - Average Latency (ms)",
+      "title": "spawndb - Average Latency (ms)",
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {
@@ -178,8 +178,8 @@
       "id": 8,
       "targets": [
         {
-          "expr": "flashdb_connected_clients",
-          "legendFormat": "FlashDB",
+          "expr": "spawndb_connected_clients",
+          "legendFormat": "spawndb",
           "refId": "A"
         },
         {
@@ -201,8 +201,8 @@
       "id": 9,
       "targets": [
         {
-          "expr": "flashdb_keys_total",
-          "legendFormat": "FlashDB",
+          "expr": "spawndb_keys_total",
+          "legendFormat": "spawndb",
           "refId": "A"
         },
         {
@@ -224,8 +224,8 @@
       "id": 10,
       "targets": [
         {
-          "expr": "sum(rate(flashdb_commands_total{status=\"ok\"}[1m]))",
-          "legendFormat": "FlashDB",
+          "expr": "sum(rate(spawndb_commands_total{status=\"ok\"}[1m]))",
+          "legendFormat": "spawndb",
           "refId": "A"
         },
         {
@@ -247,12 +247,12 @@
       "id": 11,
       "targets": [
         {
-          "expr": "sum(rate(flashdb_errors_total[1m]))",
-          "legendFormat": "FlashDB errors",
+          "expr": "sum(rate(spawndb_errors_total[1m]))",
+          "legendFormat": "spawndb errors",
           "refId": "A"
         }
       ],
-      "title": "FlashDB Error Rate",
+      "title": "spawndb Error Rate",
       "type": "stat",
       "fieldConfig": {
         "defaults": {
@@ -273,12 +273,12 @@
       "id": 12,
       "targets": [
         {
-          "expr": "rate(flashdb_errors_total[1m])",
+          "expr": "rate(spawndb_errors_total[1m])",
           "legendFormat": "{{type}}",
           "refId": "A"
         }
       ],
-      "title": "FlashDB - Errors by Type",
+      "title": "spawndb - Errors by Type",
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {
@@ -291,12 +291,12 @@
       "id": 13,
       "targets": [
         {
-          "expr": "rate(flashdb_commands_total[1m])",
+          "expr": "rate(spawndb_commands_total[1m])",
           "legendFormat": "{{command}} - {{status}}",
           "refId": "A"
         }
       ],
-      "title": "FlashDB - Commands by Type and Status",
+      "title": "spawndb - Commands by Type and Status",
       "type": "timeseries",
       "fieldConfig": {
         "defaults": {
@@ -318,24 +318,24 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "expr": "{service=\"flashdb\"}",
+          "expr": "{service=\"spawndb\"}",
           "refId": "A"
         }
       ],
-      "title": "FlashDB Logs",
+      "title": "spawndb Logs",
       "type": "logs"
     }
   ],
   "refresh": "5s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["flashdb", "redis", "benchmark"],
+  "tags": ["spawndb", "redis", "benchmark"],
   "templating": { "list": [] },
   "time": { "from": "now-15m", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "FlashDB vs Redis Benchmark",
-  "uid": "flashdb-vs-redis",
+  "title": "spawndb vs Redis Benchmark",
+  "uid": "spawndb-vs-redis",
   "version": 1,
   "weekStart": ""
 }

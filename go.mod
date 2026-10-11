@@ -1,4 +1,4 @@
-module github.com/shraj19/flashdb
+module github.com/shraj19/spawndb
 
 go 1.25.0
 

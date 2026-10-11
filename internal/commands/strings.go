@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/core"
-	"github.com/shraj19/flashdb/internal/replication"
-	"github.com/shraj19/flashdb/internal/resp"
-	"github.com/shraj19/flashdb/internal/storage"
+	"github.com/shraj19/spawndb/internal/core"
+	"github.com/shraj19/spawndb/internal/replication"
+	"github.com/shraj19/spawndb/internal/resp"
+	"github.com/shraj19/spawndb/internal/storage"
 )
 
 // --- String command factories (use DataStore) ---

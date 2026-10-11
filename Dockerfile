@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 go build -o flashdb ./main.go
+RUN CGO_ENABLED=0 go build -o spawndb ./main.go
 
 # Runtime stage
 FROM alpine:latest
@@ -24,10 +24,10 @@ WORKDIR /root/
 RUN apk add --no-cache netcat-openbsd
 
 # Copy binary from builder
-COPY --from=builder /app/flashdb .
+COPY --from=builder /app/spawndb .
 
 # Expose Redis port and metrics port
 EXPOSE 6379 9121
 
 # Run the application
-CMD ["./flashdb"]
+CMD ["./spawndb"]

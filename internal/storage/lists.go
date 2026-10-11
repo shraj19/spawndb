@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/utilities/deque"
+	"github.com/shraj19/spawndb/internal/utilities/deque"
 )
 
 // listStore implements ListStore interface.

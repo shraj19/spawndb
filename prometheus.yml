@@ -1,18 +1,18 @@
-# Prometheus configuration for FlashDB benchmarking
-# Scrapes both FlashDB and real Redis (via redis_exporter) for comparison
+# Prometheus configuration for spawndb benchmarking
+# Scrapes both spawndb and real Redis (via redis_exporter) for comparison
 
 global:
   scrape_interval: 5s      # Faster scrape for benchmark granularity
   evaluation_interval: 5s
 
 scrape_configs:
-  # FlashDB metrics
-  - job_name: "flashdb"
+  # spawndb metrics
+  - job_name: "spawndb"
     static_configs:
-      - targets: ["flashdb:9121"]
+      - targets: ["spawndb:9121"]
     relabel_configs:
       - target_label: "db"
-        replacement: "flashdb"
+        replacement: "spawndb"
 
   # Real Redis via redis_exporter (baseline comparison)
   - job_name: "redis"

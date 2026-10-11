@@ -1,12 +1,12 @@
-# FlashDB Roadmap
+# spawndb Roadmap
 
 ## Why This Matters
 
-FlashDB is multi-goroutine with per-key sharding. Redis is single-threaded.
+spawndb is multi-goroutine with per-key sharding. Redis is single-threaded.
 
-**Current state:** On basic ops (SET/GET/INCR/LPUSH), FlashDB achieves ~95% of Redis performance. These operations are too fast for parallelism to help — they're I/O bound.
+**Current state:** On basic ops (SET/GET/INCR/LPUSH), spawndb achieves ~95% of Redis performance. These operations are too fast for parallelism to help — they're I/O bound.
 
-**Goal:** Implement CPU-heavy operations where FlashDB's parallelism provides a real advantage over Redis's single-threaded model.
+**Goal:** Implement CPU-heavy operations where spawndb's parallelism provides a real advantage over Redis's single-threaded model.
 
 ---
 
@@ -15,7 +15,7 @@ FlashDB is multi-goroutine with per-key sharding. Redis is single-threaded.
 These are CPU-bound operations where multi-core execution should beat Redis.
 
 ### 1.1 Pipelining Support
-**Why:** Currently FlashDB processes commands one-by-one. With pipelining, clients send N commands without waiting; server should batch responses.
+**Why:** Currently spawndb processes commands one-by-one. With pipelining, clients send N commands without waiting; server should batch responses.
 
 **Impact:** 3-5x throughput gap vs Redis with P=16+
 
@@ -24,7 +24,7 @@ These are CPU-bound operations where multi-core execution should beat Redis.
 - Batch responses into single Write() call
 - Reduces syscall overhead
 
-**Benchmark to beat:** Redis at P=16 does 1.5M ops/sec, FlashDB does 500k
+**Benchmark to beat:** Redis at P=16 does 1.5M ops/sec, spawndb does 500k
 
 ---
 
@@ -165,13 +165,13 @@ These are CPU-bound operations where multi-core execution should beat Redis.
 
 ## Benchmarks to Run
 
-### Lock Contention Test (FlashDB should lose)
+### Lock Contention Test (spawndb should lose)
 ```bash
 # All clients hitting SAME key
 redis-benchmark -t incr -n 100000 -c 50 -r 1
 ```
 
-### Parallelism Advantage Test (FlashDB should win)
+### Parallelism Advantage Test (spawndb should win)
 ```bash
 # Large LRANGE on different keys
 # Need custom benchmark — redis-benchmark doesn't support this well

@@ -3,7 +3,7 @@ package commands
 import (
 	"testing"
 
-	"github.com/shraj19/flashdb/internal/core"
+	"github.com/shraj19/spawndb/internal/core"
 )
 
 func TestMULTIEXECQueueAndRunCommands(t *testing.T) {

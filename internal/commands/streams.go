@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/core"
-	"github.com/shraj19/flashdb/internal/resp"
-	"github.com/shraj19/flashdb/internal/storage"
-	"github.com/shraj19/flashdb/internal/utilities"
+	"github.com/shraj19/spawndb/internal/core"
+	"github.com/shraj19/spawndb/internal/resp"
+	"github.com/shraj19/spawndb/internal/storage"
+	"github.com/shraj19/spawndb/internal/utilities"
 )
 
 // --- Stream command factories (use DataStore) ---

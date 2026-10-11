@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/shraj19/flashdb/internal/core"
-	"github.com/shraj19/flashdb/internal/resp"
+	"github.com/shraj19/spawndb/internal/core"
+	"github.com/shraj19/spawndb/internal/resp"
 )
 
 // execLock ensures MULTI/EXEC transactions are atomic and isolated.

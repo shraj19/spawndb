@@ -1,4 +1,4 @@
-// Package metrics defines Prometheus metrics for FlashDB.
+// Package metrics defines Prometheus metrics for spawndb.
 //
 // It mirrors the pattern used in the Relay project: metrics are declared as
 // package-level vars under a single namespace and registered via Register(reg),
@@ -36,7 +36,7 @@ var (
 	// status (ok or error).
 	CommandsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "flashdb",
+			Namespace: "spawndb",
 			Name:      "commands_total",
 			Help:      "Total number of commands processed",
 		},
@@ -48,7 +48,7 @@ var (
 	// slower blocking commands.
 	CommandDuration = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Namespace: "flashdb",
+			Namespace: "spawndb",
 			Name:      "command_duration_seconds",
 			Help:      "Command processing latency distributions in seconds",
 			Buckets:   prometheus.ExponentialBuckets(0.0001, 2, 15), // 0.1ms to ~3s
@@ -60,7 +60,7 @@ var (
 	// wrongtype, etc.), independent of per-command status for easy alerting.
 	ErrorsTotal = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "flashdb",
+			Namespace: "spawndb",
 			Name:      "errors_total",
 			Help:      "Total errors by type",
 		},
@@ -74,7 +74,7 @@ var (
 	// ConnectedClients tracks the number of currently connected clients.
 	ConnectedClients = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: "flashdb",
+			Namespace: "spawndb",
 			Name:      "connected_clients",
 			Help:      "Number of currently connected clients",
 		},
@@ -84,14 +84,14 @@ var (
 	// types. Updated periodically by a background sampler.
 	KeysTotal = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: "flashdb",
+			Namespace: "spawndb",
 			Name:      "keys_total",
 			Help:      "Total number of keys currently stored",
 		},
 	)
 )
 
-// Register registers all FlashDB metrics with the provided registerer.
+// Register registers all spawndb metrics with the provided registerer.
 //
 // In production, pass prometheus.DefaultRegisterer. In tests, pass a fresh
 // prometheus.NewRegistry() for isolated metric collection.

@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/core"
-	"github.com/shraj19/flashdb/internal/resp"
-	"github.com/shraj19/flashdb/internal/storage"
+	"github.com/shraj19/spawndb/internal/core"
+	"github.com/shraj19/spawndb/internal/resp"
+	"github.com/shraj19/spawndb/internal/storage"
 )
 
 // newTestDataStore creates an isolated DataStore for testing.

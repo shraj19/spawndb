@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/core"
-	"github.com/shraj19/flashdb/internal/replication"
-	"github.com/shraj19/flashdb/internal/resp"
+	"github.com/shraj19/spawndb/internal/core"
+	"github.com/shraj19/spawndb/internal/replication"
+	"github.com/shraj19/spawndb/internal/resp"
 )
 
 // PING command

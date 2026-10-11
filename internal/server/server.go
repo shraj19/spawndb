@@ -14,12 +14,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/shraj19/flashdb/internal/commands"
-	"github.com/shraj19/flashdb/internal/core"
-	"github.com/shraj19/flashdb/internal/metrics"
-	"github.com/shraj19/flashdb/internal/replication"
-	"github.com/shraj19/flashdb/internal/resp"
-	"github.com/shraj19/flashdb/internal/storage"
+	"github.com/shraj19/spawndb/internal/commands"
+	"github.com/shraj19/spawndb/internal/core"
+	"github.com/shraj19/spawndb/internal/metrics"
+	"github.com/shraj19/spawndb/internal/replication"
+	"github.com/shraj19/spawndb/internal/resp"
+	"github.com/shraj19/spawndb/internal/storage"
 )
 
 // logger is a structured JSON logger. JSON lines on stdout are picked up by

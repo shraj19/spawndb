@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/storage"
+	"github.com/shraj19/spawndb/internal/storage"
 )
 
 const (
-	header  = "FLASHDB"
+	header  = "spawndb"
 	version = byte(1)
 )
 
@@ -22,7 +22,7 @@ const (
 func Save(path string, db storage.DataStore) error {
 	dir := filepath.Dir(path)
 
-	file, err := os.CreateTemp(dir, "flashdb_*.tmp")
+	file, err := os.CreateTemp(dir, "spawndb_*.tmp")
 	if err != nil {
 		return err
 	}

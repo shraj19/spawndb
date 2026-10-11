@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/core"
-	"github.com/shraj19/flashdb/internal/resp"
+	"github.com/shraj19/spawndb/internal/core"
+	"github.com/shraj19/spawndb/internal/resp"
 )
 
 func StartReplica(masterHost, masterPort, localPort string) {

@@ -1,4 +1,4 @@
-// Package persistence handles saving and loading FlashDB state to disk.
+// Package persistence handles saving and loading spawndb state to disk.
 package persistence
 
 import (
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shraj19/flashdb/internal/storage"
+	"github.com/shraj19/spawndb/internal/storage"
 )
 
 // newTestDataStore creates an isolated DataStore for testing.
@@ -26,7 +26,7 @@ func TestSaveAndLoadStrings(t *testing.T) {
 			name: "basic key-value pairs",
 			keys: map[string]string{
 				"name":    "shashank",
-				"project": "flashdb",
+				"project": "spawndb",
 				"counter": "42",
 			},
 		},

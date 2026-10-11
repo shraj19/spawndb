@@ -1,189 +1,142 @@
-# FlashDB: High-Performance Key-Value Store
+# spawndb
 
-A lightweight, concurrent, in-memory key-value database built in Go, implementing the RESP (Redis Serialization Protocol).
+A high-performance, concurrent, in-memory key-value database written in Go. Implements the Redis Serialization Protocol (RESP) from scratch — compatible with `redis-cli` and Redis client libraries.
 
-## Key Features
+## Performance
 
-* **Custom Protocol Parser:** Built a raw TCP handler to parse RESP messages from scratch
-* **Concurrency Safe:** Handles concurrent read/writes using `sync.RWMutex` locks for optimal performance
-* **TTL Support:** Implemented lazy key expiration with active background eviction
-* **Replication Support:** Master/replica handshake flow, `REPLCONF`, `PSYNC`, and `WAIT` handling with offset tracking
-* **Stream Processing:** Support for Redis-like streams with blocking reads
-* **Transaction Support:** MULTI/EXEC/DISCARD transaction handling with command queuing
-* **Persistence:** Binary snapshot persistence with atomic writes
-* **Basic Metrics:** Periodic logging of keys count, connected clients, and command count
+Benchmarked against Redis 6 on AWS EC2 (m7i-flex.large, localhost):
 
-## Tech Stack
+| Scenario | spawndb | Redis | Ratio |
+|----------|---------|-------|-------|
+| Basic ops (SET/GET/INCR) | 150k ops/s | 157k ops/s | **96%** |
+| List ops (LPUSH/LPOP) | 157k ops/s | 156k ops/s | **100%** |
+| High concurrency (200 clients) | 140k ops/s | 147k ops/s | **95%** |
+| Large values (10KB) | 55-91k ops/s | 90-107k ops/s | 61-84% |
+| Pipelining (P=16) | 230k ops/s | 1.4M ops/s | 17% |
 
-* **Go (Golang)** - Core language for high-performance concurrency
-* **TCP Networking** - Low-level socket programming using `net` package
-* **Docker** - Containerized deployment for portability
+**spawndb achieves 95-100% of Redis performance on core operations.**
 
-## Supported Commands
+See [`benchmark-results/`](benchmark-results/) for full methodology and raw data.
 
-### String Operations
-- `SET key value [EX seconds] [PX milliseconds]` - Set key with optional TTL
-- `GET key` - Retrieve value by key
-- `INCR key` - Increment integer value
-- `TYPE key` - Get the type of a key (string, list, stream, or none)
+## Features
 
-### List Operations
-- `LPUSH key value [value ...]` - Push to list head
-- `RPUSH key value [value ...]` - Push to list tail
-- `LPOP key [count]` - Pop from list head
-- `BLPOP key timeout` - Blocking pop from list head
-- `LRANGE key start stop` - Get range of elements
-- `LLEN key` - Get list length
+### Core
+- **RESP Protocol** — Hand-built parser/encoder, wire-compatible with Redis
+- **Concurrent Architecture** — Goroutine-per-connection with sharded per-key locking (256 buckets)
+- **TTL Support** — Lazy expiration on access + active background eviction
+- **Persistence** — Binary RDB snapshots with atomic writes
 
-### Stream Operations
-- `XADD stream_key * field value [field value ...]` - Add entry to stream
-- `XRANGE stream_key start end` - Query stream entries
-- `XREAD [BLOCK milliseconds] STREAMS stream_key [stream_key ...] id [id ...]` - Read from streams
+### Data Structures
+- **Strings** — SET, GET, INCR with TTL support
+- **Lists** — LPUSH, RPUSH, LPOP, BLPOP (blocking), LRANGE, LLEN
+- **Streams** — XADD, XREAD (with BLOCK), XRANGE
 
-### Transactions
-- `MULTI` - Start transaction
-- `EXEC` - Execute queued commands
-- `DISCARD` - Abort transaction and discard queued commands
+### Advanced
+- **Transactions** — MULTI/EXEC/DISCARD with command queuing
+- **Replication** — Master/replica sync via REPLCONF, PSYNC, WAIT
+- **Observability** — Prometheus metrics endpoint, structured JSON logging
 
-### General
-- `PING` - Health check
-- `ECHO message` - Echo message back
-- `INFO [section]` - Server information (sections: server, replication)
+## Quick Start
 
-### Replication
-- `REPLCONF ...` - Replica configuration and ACK
-- `PSYNC ...` - Initial replication handshake
-- `WAIT numreplicas timeout` - Wait for replicas to acknowledge writes
-
-## Replication
-
-FlashDB supports a Redis-like replication flow for basic leader/follower setups:
-
-- Master keeps a replication offset and tracks connected replicas
-- Replicas connect with `PING`, `REPLCONF`, and `PSYNC`
-- Master emits a full resync frame and propagates writes to connected replicas
-- `WAIT` blocks until enough replicas acknowledge the master offset
-
-### Start a master
 ```bash
-go run . --port 6379
-```
+# Build and run
+go build -o spawndb .
+./spawndb --port 6379
 
-### Start a replica
-```bash
-go run . --port 6380 --replicaof 127.0.0.1 6379
-```
-
-### Validate replication flow
-```bash
-redis-cli -p 6379
-> SET hello world
-OK
-> WAIT 1 1000
-(integer) 1
-```
-
-## How to Run
-
-### Using Go directly
-```bash
-go build -o flashdb .
-./flashdb
-```
-
-### Using Docker
-```bash
-docker build -t flashdb .
-docker run -p 6379:6379 flashdb
-```
-
-### Testing with redis-cli
-```bash
+# Connect with redis-cli
 redis-cli -p 6379
 > PING
 PONG
-> SET mykey "Hello FlashDB"
+> SET user:1 "alice"
 OK
-> GET mykey
-"Hello FlashDB"
+> GET user:1
+"alice"
 ```
+
+### Docker
+
+```bash
+docker build -t spawndb .
+docker run -p 6379:6379 -p 9121:9121 spawndb
+```
+
+### Replication
+
+```bash
+# Start master
+./spawndb --port 6379
+
+# Start replica
+./spawndb --port 6380 --replicaof 127.0.0.1 6379
+
+# Verify
+redis-cli -p 6379 SET hello world
+redis-cli -p 6379 WAIT 1 1000  # Wait for replica ACK
+redis-cli -p 6380 GET hello    # Returns "world"
+```
+
+## Supported Commands
+
+| Category | Commands |
+|----------|----------|
+| **Strings** | `SET` `GET` `INCR` `TYPE` |
+| **Lists** | `LPUSH` `RPUSH` `LPOP` `BLPOP` `LRANGE` `LLEN` |
+| **Streams** | `XADD` `XREAD` `XRANGE` |
+| **Transactions** | `MULTI` `EXEC` `DISCARD` |
+| **Server** | `PING` `ECHO` `INFO` |
+| **Replication** | `REPLCONF` `PSYNC` `WAIT` |
 
 ## Architecture
 
 ```
-flashdb/
-├── main.go                  # Entry point
-├── cmd/
-│   └── server/
-│       └── main.go          # Alternative entry point
-├── internal/
-│   ├── core/
-│   │   └── types.go         # Shared types (Client, CommandHandler)
-│   ├── commands/
-│   │   ├── general.go       # PING, ECHO, INFO, WAIT, REPLCONF, PSYNC
-│   │   ├── strings.go       # SET, GET, INCR, TYPE
-│   │   ├── lists.go         # LPUSH, RPUSH, LPOP, BLPOP, LRANGE, LLEN
-│   │   ├── streams.go       # XADD, XRANGE, XREAD
-│   │   └── transactions.go  # MULTI, EXEC, DISCARD
-│   ├── persistence/
-│   │   └── rdb.go           # Binary snapshot save/load
-│   ├── replication/
-│   │   ├── state.go         # ReplicationState, replica tracking
-│   │   └── replica.go       # Replica connection and sync logic
-│   ├── resp/
-│   │   └── resp.go          # RESP protocol encoder/decoder
-│   ├── server/
-│   │   └── server.go        # TCP server & client handler
-│   ├── storage/
-│   │   ├── interfaces.go    # DataStore, StringStore, ListStore, StreamStore
-│   │   ├── types.go         # Data types, errors, StreamEntry
-│   │   ├── keylock.go       # Per-key sharded locking (256 buckets)
-│   │   ├── datastore.go     # Composition root, atomic operations
-│   │   ├── strings.go       # String store implementation
-│   │   ├── lists.go         # List store with blocking ops
-│   │   ├── streams.go       # Stream store with blocking reads
-│   │   ├── registry.go      # Type registry (WRONGTYPE checks)
-│   │   └── ttl.go           # TTL manager with lazy expiry
-│   └── utilities/
-│       └── utilities.go     # Helper functions
+internal/
+├── server/       # TCP server, connection handling, metrics endpoint
+├── resp/         # RESP protocol encoder/decoder
+├── commands/     # Command implementations (strings, lists, streams, etc.)
+├── storage/
+│   ├── datastore.go   # Composition root
+│   ├── keylock.go     # Sharded per-key locking
+│   ├── strings.go     # String store
+│   ├── lists.go       # List store with blocking ops
+│   ├── streams.go     # Stream store
+│   ├── ttl.go         # TTL manager
+│   └── registry.go    # Type registry (WRONGTYPE checks)
+├── replication/  # Master/replica sync logic
+├── persistence/  # RDB snapshots
+└── metrics/      # Prometheus instrumentation
 ```
 
-## Performance Features
+### Concurrency Model
 
-- **Goroutine-per-connection:** Concurrent client handling with dedicated goroutines
-- **Per-key locking:** Sharded KeyLock (256 buckets) enables fine-grained concurrency without global contention
-- **RWMutex optimization:** Read-write mutex allows concurrent reads within stores
-- **Lazy + Active expiration:** TTL keys expired on access and via background sweep
-- **Atomic persistence:** Temp file + rename pattern prevents corruption
-- **Metrics logging:** Background task logs keys, clients, and commands every 10s
-
-## Concurrency Safety
-
-FlashDB is designed for concurrent access with multiple safety mechanisms:
-
-- **Per-key atomicity:** Operations like SET, GET, LPUSH are atomic per-key via KeyLock
-- **Cross-store consistency:** Registry + data store operations protected against TOCTOU races
-- **Transaction isolation:** MULTI/EXEC runs under global lock, preventing command interleaving
-- **Blocking operations:** BLPOP/XREAD BLOCK handle multi-key waiter cleanup atomically
-- **Replication safety:** Per-replica write serialization prevents RESP framing corruption
+- **Goroutine-per-connection** — Each client gets a dedicated goroutine
+- **Sharded KeyLock** — 256 lock buckets, keys hash to buckets for fine-grained locking
+- **RWMutex per store** — Concurrent reads, serialized writes within each data structure
+- **Atomic cross-store ops** — Registry + data operations protected against TOCTOU races
 
 ## Development
 
 ```bash
-# Run tests
-go test ./...
-
-# Format code
-go fmt ./...
-
-# Build binary
-go build -o flashdb .
+go test ./...      # Run tests
+go build ./...     # Build
+go run . --port 6379 --metrics-port 9121
 ```
+
+### Metrics
+
+spawndb exposes Prometheus metrics at `:9121/metrics`:
+
+- `spawndb_commands_total` — Commands processed by type and status
+- `spawndb_command_duration_seconds` — Latency histograms per command
+- `spawndb_connected_clients` — Current client connections
+- `spawndb_keys_total` — Total keys in database
+
+This project demonstrates:
+
+1. **Low-level network programming** — Raw TCP, custom protocol parsing
+2. **Concurrent systems design** — Lock hierarchies, avoiding deadlocks, blocking operations
+3. **Performance engineering** — Benchmarking methodology, profiling, optimization
+4. **Redis internals** — How a production database actually works
 
 ## License
 
-MIT License - Feel free to use this project for learning and development.
-
-## Author
-
-Built with ❤️ as a learning project to understand low-level database internals and network programming in Go.
+MIT

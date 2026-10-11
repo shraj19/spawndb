@@ -1,9 +1,20 @@
-# FlashDB
+# Binaries
+spawndb
 server
-flashdb
 *.exe
 *.out
+
+# OS files
 .DS_Store
-flashdb
-TECHNICAL_DETAILS.md
-docs/
+
+# IDE
+.idea/
+.vscode/
+
+# Temporary files
+*.tmp
+*.log
+
+# Build artifacts
+/bin/
+/dist/

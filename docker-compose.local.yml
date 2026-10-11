@@ -1,20 +1,20 @@
-# FlashDB local development + benchmarking stack
+# spawndb local development + benchmarking stack
 #
 # Run with: docker-compose -f docker-compose.local.yml up
 #
 # Services:
-#   - flashdb:        FlashDB server (builds from source)
+#   - spawndb:        spawndb server (builds from source)
 #   - redis:          Real Redis (baseline for comparison)
 #   - redis_exporter: Prometheus exporter for Redis metrics
-#   - prometheus:     Metrics collection (scrapes flashdb + redis_exporter)
+#   - prometheus:     Metrics collection (scrapes spawndb + redis_exporter)
 #   - loki:           Log aggregation
 #   - promtail:       Log shipper (Docker container logs → Loki)
 #   - grafana:        Dashboards (localhost:3000, admin/admin)
 #
 # Ports:
-#   - 6379: FlashDB (RESP)
+#   - 6379: spawndb (RESP)
 #   - 6380: Redis (RESP)
-#   - 9121: FlashDB metrics
+#   - 9121: spawndb metrics
 #   - 9122: Redis exporter metrics
 #   - 9090: Prometheus UI
 #   - 3100: Loki API
@@ -25,7 +25,7 @@ services:
   # Database targets (what we're benchmarking)
   # ─────────────────────────────────────────────────────────────────
 
-  flashdb:
+  spawndb:
     build:
       context: .
       dockerfile: Dockerfile
@@ -82,7 +82,7 @@ services:
       - '--storage.tsdb.retention.time=7d'
       - '--web.enable-lifecycle'
     depends_on:
-      - flashdb
+      - spawndb
       - redis_exporter
     restart: unless-stopped
 
