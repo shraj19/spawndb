@@ -1,0 +1,9 @@
+ERROR: ERR unknown command 'CONFIG'
+ERROR: failed to fetch CONFIG from 10.0.1.87:6379
+WARN: could not fetch server CONFIG
+"test","rps","avg_latency_ms","min_latency_ms","p50_latency_ms","p95_latency_ms","p99_latency_ms","max_latency_ms"
+"SET","203252.03","0.197","0.056","0.191","0.295","0.511","9.335"
+"GET","206868.02","0.186","0.064","0.183","0.255","0.335","7.007"
+"INCR","204582.66","0.196","0.048","0.183","0.287","0.503","8.663"
+"LPUSH","205803.66","0.191","0.048","0.183","0.263","0.391","27.135"
+"LPOP","206696.98","0.189","0.048","0.183","0.271","0.367","9.295"

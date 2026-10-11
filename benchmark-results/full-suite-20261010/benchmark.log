@@ -1,0 +1,58 @@
+[2026-10-10 19:53:59] === FlashDB Benchmark Suite ===
+[2026-10-10 19:54:00] S3: s3://flashdb-bench-artifacts-072055531063/benchmark-runs/full-suite-20261010-195359
+[2026-10-10 19:54:03] Testing connectivity...
+[2026-10-10 19:54:04]   FlashDB: OK
+[2026-10-10 19:54:05]   Redis Native: FAILED
+[2026-10-10 19:54:06]   Redis Docker: OK
+[2026-10-10 19:54:07] === Pipeline 1 ===
+[2026-10-10 19:54:08]   Running: flashdb (P=1 n=100000 c=50)
+[2026-10-10 19:54:19]   Saved to S3: flashdb-P1.csv
+[2026-10-10 19:54:20]   Running: redis-native (P=1 n=100000 c=50)
+[2026-10-10 19:56:18]   Saved to S3: redis-native-P1.csv
+[2026-10-10 19:56:18]   Running: redis-docker (P=1 n=100000 c=50)
+[2026-10-10 19:56:22]   Saved to S3: redis-docker-P1.csv
+[2026-10-10 19:56:22] === Pipeline 16 ===
+[2026-10-10 19:56:23]   Running: flashdb (P=16 n=100000 c=50)
+[2026-10-10 19:56:24]   Saved to S3: flashdb-P16.csv
+[2026-10-10 19:56:25]   Running: redis-native (P=16 n=100000 c=50)
+[2026-10-10 19:56:26]   Saved to S3: redis-native-P16.csv
+[2026-10-10 19:56:26]   Running: redis-docker (P=16 n=100000 c=50)
+[2026-10-10 19:56:27]   Saved to S3: redis-docker-P16.csv
+[2026-10-10 19:56:28] === Pipeline 64 ===
+[2026-10-10 19:56:28]   Running: flashdb (P=64 n=100000 c=50)
+[2026-10-10 19:56:30]   Saved to S3: flashdb-P64.csv
+[2026-10-10 19:56:30]   Running: redis-native (P=64 n=100000 c=50)
+[2026-10-10 19:56:31]   Saved to S3: redis-native-P64.csv
+[2026-10-10 19:56:31]   Running: redis-docker (P=64 n=100000 c=50)
+[2026-10-10 19:56:33]   Saved to S3: redis-docker-P64.csv
+[2026-10-10 19:56:33] === Clients 10 ===
+[2026-10-10 19:56:33]   Running: flashdb (P=1 n=100000 c=10)
+[2026-10-10 19:56:39]   Saved to S3: flashdb-P1.csv
+[2026-10-10 19:56:40]   Running: redis-native (P=1 n=100000 c=10)
+[2026-10-10 19:56:46]   Saved to S3: redis-native-P1.csv
+[2026-10-10 19:56:46] === Clients 50 ===
+[2026-10-10 19:56:47]   Running: flashdb (P=1 n=100000 c=50)
+[2026-10-10 19:56:50]   Saved to S3: flashdb-P1.csv
+[2026-10-10 19:56:50]   Running: redis-native (P=1 n=100000 c=50)
+[2026-10-10 19:56:53]   Saved to S3: redis-native-P1.csv
+[2026-10-10 19:56:54] === Clients 100 ===
+[2026-10-10 19:56:54]   Running: flashdb (P=1 n=100000 c=100)
+[2026-10-10 19:56:57]   Saved to S3: flashdb-P1.csv
+[2026-10-10 19:56:58]   Running: redis-native (P=1 n=100000 c=100)
+[2026-10-10 19:57:01]   Saved to S3: redis-native-P1.csv
+[2026-10-10 19:57:01] === Clients 200 ===
+[2026-10-10 19:57:02]   Running: flashdb (P=1 n=100000 c=200)
+[2026-10-10 19:57:06]   Saved to S3: flashdb-P1.csv
+[2026-10-10 19:57:06]   Running: redis-native (P=1 n=100000 c=200)
+[2026-10-10 19:57:10]   Saved to S3: redis-native-P1.csv
+[2026-10-10 19:57:11] === DataSize 3 ===
+[2026-10-10 19:57:14] === DataSize 100 ===
+[2026-10-10 19:57:17] === DataSize 1024 ===
+[2026-10-10 19:57:20] === DataSize 10240 ===
+[2026-10-10 19:57:25] === Extended 1M ===
+[2026-10-10 19:57:26]   Running: flashdb (P=1 n=1000000 c=50)
+[2026-10-10 19:57:51]   Saved to S3: flashdb-P1.csv
+[2026-10-10 19:57:51]   Running: redis-native (P=1 n=1000000 c=50)
+[2026-10-10 19:58:15]   Saved to S3: redis-native-P1.csv
+[2026-10-10 19:58:16] === COMPLETE ===
+[2026-10-10 19:58:16] Download: aws s3 cp s3://flashdb-bench-artifacts-072055531063/benchmark-runs/full-suite-20261010-195359 ./results/ --recursive
