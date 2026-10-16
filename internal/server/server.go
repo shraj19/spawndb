@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	_ "net/http/pprof" // Register pprof handlers on default mux
 	"os"
 	"strings"
 	"time"
@@ -128,11 +129,17 @@ func executeCommand(args []string, client *core.Client) string {
 	return response
 }
 
-// startMetricsEndpoint serves Prometheus metrics on the given address.
+// startMetricsEndpoint serves Prometheus metrics and pprof on the given address.
 // It runs in its own goroutine on a port separate from the RESP server so
 // scraping never competes with client traffic on the data port.
+//
+// Endpoints:
+//   - /metrics  - Prometheus metrics
+//   - /health   - Health check
+//   - /debug/pprof/* - Go profiling (CPU, heap, mutex, block, goroutine)
 func startMetricsEndpoint(addr string) {
-	mux := http.NewServeMux()
+	// Use default mux which has pprof handlers registered via import
+	mux := http.DefaultServeMux
 	mux.Handle("/metrics", promhttp.Handler())
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -1,0 +1,7 @@
+# Ignore all benchmark run data
+*
+
+# Keep these files
+!.gitignore
+!README.md
+!HISTORY.md
