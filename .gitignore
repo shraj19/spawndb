@@ -1,6 +1,6 @@
 # Binaries
 spawndb
-server
+/server
 *.exe
 *.out
 
