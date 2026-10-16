@@ -381,6 +381,45 @@ func ForEach(fn func(...)) {
 | Write-heavy, many keys | ⭐⭐⭐⭐ Good (sharding helps) |
 | Write-heavy, same key | ⭐⭐ Fair (unavoidable serialization) |
 
+### 6.6 Pipelining Implementation
+**Type:** Design decision (documented 2026-10-16)
+
+**Context:** Pipelining allows clients to send multiple commands without waiting for responses. Server batches responses and sends them in fewer syscalls.
+
+**Implementation:** Accumulation buffer with non-blocking TryParse:
+```go
+for {
+    n, _ := conn.Read(buf)
+    accumulated = append(accumulated, buf[:n]...)
+    
+    // Parse all complete commands
+    for {
+        args, consumed, ok := TryParse(accumulated)
+        if !ok { break }
+        accumulated = accumulated[consumed:]
+        writer.Write(execute(args))
+    }
+    
+    writer.Flush()  // One syscall for all responses
+}
+```
+
+**Trade-off considered — Re-parsing on incomplete commands:**
+- If TCP delivers partial command, we re-parse same bytes on next Read()
+- Alternative: Track parse position to resume (more complex)
+- Decision: Accept re-parsing because:
+  - Parsing is CPU-cheap (nanoseconds) vs network I/O (milliseconds)
+  - TCP fragmentation mid-command is rare in practice
+  - Simplicity > micro-optimization
+  - If profiling shows parsing bottleneck, can add position tracking later
+
+**Performance improvement:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Syscalls for 100 cmds | 100 write() | 1-few write() |
+| Network packets | 100 | 1-few |
+| Latency (100 cmds, 1ms RTT) | ~100ms | ~1ms |
+
 ---
 
 ## 7. Test Coverage

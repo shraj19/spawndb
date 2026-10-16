@@ -235,3 +235,115 @@ func Array(items []string) string {
 	}
 	return b.String()
 }
+
+
+// --- Non-blocking parsing for pipelining ---
+
+// TryParse attempts to parse a complete RESP command from buf.
+// Returns (args, bytesConsumed, true) if complete command found.
+// Returns (nil, 0, false) if incomplete (need more data).
+//
+// Note: This re-parses from the start each time. We accept this because:
+// - Parsing is CPU-cheap (nanoseconds) vs network I/O (milliseconds)
+// - TCP fragmentation mid-command is rare in practice
+// - Optimizing with position tracking adds complexity for minimal gain
+// If profiling shows parsing as bottleneck, consider tracking parse position.
+func TryParse(buf []byte) ([]string, int, bool) {
+	if len(buf) == 0 {
+		return nil, 0, false
+	}
+
+	// Find first line ending
+	pos := findCRLF(buf, 0)
+	if pos == -1 {
+		return nil, 0, false
+	}
+
+	firstLine := string(buf[:pos])
+
+	// Handle array format (*N\r\n)
+	if len(firstLine) > 0 && firstLine[0] == '*' {
+		count, err := strconv.Atoi(firstLine[1:])
+		if err != nil || count < 0 {
+			return nil, 0, false
+		}
+		if count == 0 {
+			return []string{}, pos + 2, true
+		}
+
+		args := make([]string, 0, count)
+		offset := pos + 2 // Skip past *N\r\n
+
+		for range count {
+			arg, consumed, ok := tryParseBulkString(buf, offset)
+			if !ok {
+				return nil, 0, false
+			}
+			args = append(args, arg)
+			offset += consumed
+		}
+
+		return args, offset, true
+	}
+
+	// Handle inline command (space-separated)
+	return strings.Fields(firstLine), pos + 2, true
+}
+
+// tryParseBulkString attempts to parse a bulk string starting at offset.
+// Returns (string, bytesConsumed, true) if complete.
+func tryParseBulkString(buf []byte, offset int) (string, int, bool) {
+	if offset >= len(buf) {
+		return "", 0, false
+	}
+
+	// Find length line
+	pos := findCRLF(buf, offset)
+	if pos == -1 {
+		return "", 0, false
+	}
+
+	lenLine := string(buf[offset:pos])
+	if len(lenLine) == 0 || lenLine[0] != '$' {
+		return "", 0, false
+	}
+
+	length, err := strconv.Atoi(lenLine[1:])
+	if err != nil {
+		return "", 0, false
+	}
+
+	// Null bulk string
+	if length == -1 {
+		return "", pos + 2 - offset, true
+	}
+
+	if length < 0 {
+		return "", 0, false
+	}
+
+	// Check if we have enough data: $len\r\n + data + \r\n
+	dataStart := pos + 2
+	dataEnd := dataStart + length
+	if dataEnd+2 > len(buf) {
+		return "", 0, false // Need more data
+	}
+
+	// Verify CRLF after data
+	if buf[dataEnd] != '\r' || buf[dataEnd+1] != '\n' {
+		return "", 0, false
+	}
+
+	return string(buf[dataStart:dataEnd]), dataEnd + 2 - offset, true
+}
+
+// findCRLF finds the position of \r\n starting from offset.
+// Returns -1 if not found.
+func findCRLF(buf []byte, offset int) int {
+	for i := offset; i < len(buf)-1; i++ {
+		if buf[i] == '\r' && buf[i+1] == '\n' {
+			return i
+		}
+	}
+	return -1
+}

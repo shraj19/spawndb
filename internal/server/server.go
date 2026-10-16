@@ -28,7 +28,16 @@ var logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 	Level: slog.LevelInfo,
 }))
 
-// HandleConnection handles one client connection.
+// HandleConnection handles one client connection with pipelining support.
+//
+// Pipelining: Client can send multiple commands without waiting for responses.
+// We read all available data, parse complete commands, execute them, buffer
+// responses, and flush after processing each batch.
+//
+// Implementation note: We use an accumulation buffer and re-parse from start
+// on each iteration. This is simple and correct. Re-parsing is CPU-cheap
+// (nanoseconds) compared to network I/O (milliseconds). If profiling shows
+// parsing as bottleneck, consider tracking parse position instead.
 func HandleConnection(conn net.Conn) {
 	defer conn.Close()
 	storage.IncrementClients()
@@ -40,59 +49,83 @@ func HandleConnection(conn net.Conn) {
 
 	// Use Client for per-connection state
 	client := &core.Client{Conn: conn}
-	reader := bufio.NewReader(conn)
+
+	// Pipelining buffers
+	readBuf := make([]byte, 4096)
+	var accumulated []byte
+	writer := bufio.NewWriter(conn)
 
 	for {
-		args, err := resp.ParseRESP(reader)
-		if err == io.EOF {
-			return
-		}
-
+		// Read whatever is available from TCP
+		n, err := conn.Read(readBuf)
 		if err != nil {
-			metrics.ErrorsTotal.WithLabelValues("parse").Inc()
-			logger.Error("parse error", "err", err.Error(), "remote", conn.RemoteAddr().String())
+			if err != io.EOF {
+				metrics.ErrorsTotal.WithLabelValues("read").Inc()
+				logger.Error("read error", "err", err.Error(), "remote", conn.RemoteAddr().String())
+			}
 			return
 		}
 
-		if len(args) == 0 {
-			continue
-		}
+		accumulated = append(accumulated, readBuf[:n]...)
 
-		storage.IncrementCommands()
-		cmdName := strings.ToUpper(args[0])
+		// Parse and execute all complete commands
+		for {
+			args, consumed, complete := resp.TryParse(accumulated)
+			if !complete {
+				break // Need more data
+			}
 
-		handler, ok := core.CommandMap[cmdName]
-		if !ok {
-			metrics.ErrorsTotal.WithLabelValues("unknown_command").Inc()
-			metrics.CommandsTotal.WithLabelValues("unknown", "error").Inc()
-			client.Conn.Write([]byte(resp.Error("unknown command '" + args[0] + "'")))
-			continue
-		}
+			accumulated = accumulated[consumed:]
 
-		// Check if client is in transaction
-		if client.InTransaction && cmdName != "EXEC" && cmdName != "DISCARD" {
-			// Commands like MULTI are not allowed inside a transaction
-			if cmdName == "MULTI" {
-				client.Conn.Write([]byte(resp.Error("MULTI calls can not be nested")))
+			if len(args) == 0 {
 				continue
 			}
 
-			// Queue the valid command
-			client.QueuedCommands = append(client.QueuedCommands, args)
-			client.Conn.Write([]byte(resp.SimpleString("QUEUED")))
-			continue
+			response := executeCommand(args, client)
+			if response != "" {
+				writer.WriteString(response)
+			}
 		}
 
-		// Execute the command normally, timing it for metrics.
-		start := time.Now()
-		response := handler(args, client)
-		isError := strings.HasPrefix(response, "-")
-		metrics.ObserveCommand(cmdName, start, isError)
-
-		if response != "" {
-			client.Conn.Write([]byte(response))
+		// Flush all buffered responses after processing batch
+		if err := writer.Flush(); err != nil {
+			metrics.ErrorsTotal.WithLabelValues("write").Inc()
+			logger.Error("write error", "err", err.Error(), "remote", conn.RemoteAddr().String())
+			return
 		}
 	}
+}
+
+// executeCommand runs a single command and returns the RESP response.
+func executeCommand(args []string, client *core.Client) string {
+	storage.IncrementCommands()
+	cmdName := strings.ToUpper(args[0])
+
+	handler, ok := core.CommandMap[cmdName]
+	if !ok {
+		metrics.ErrorsTotal.WithLabelValues("unknown_command").Inc()
+		metrics.CommandsTotal.WithLabelValues("unknown", "error").Inc()
+		return resp.Error("unknown command '" + args[0] + "'")
+	}
+
+	// Check if client is in transaction
+	if client.InTransaction && cmdName != "EXEC" && cmdName != "DISCARD" {
+		if cmdName == "MULTI" {
+			return resp.Error("MULTI calls can not be nested")
+		}
+
+		// Queue the command
+		client.QueuedCommands = append(client.QueuedCommands, args)
+		return resp.SimpleString("QUEUED")
+	}
+
+	// Execute the command, timing it for metrics
+	start := time.Now()
+	response := handler(args, client)
+	isError := strings.HasPrefix(response, "-")
+	metrics.ObserveCommand(cmdName, start, isError)
+
+	return response
 }
 
 // startMetricsEndpoint serves Prometheus metrics on the given address.
