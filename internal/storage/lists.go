@@ -19,6 +19,7 @@ type listStore struct {
 	data      map[string]*deque.Deque[string]
 	waiterReg *waiterRegistry[*waiter] // key -> waiters blocked on that key
 	registry  Registry
+	ttl       TTLManager
 	mu        sync.RWMutex
 }
 
@@ -44,11 +45,12 @@ func (w *waiter) claim() bool {
 }
 
 // NewListStore creates a new list store with dependencies.
-func NewListStore(registry Registry) ListStore {
+func NewListStore(registry Registry, ttl TTLManager) ListStore {
 	return &listStore{
 		data:      make(map[string]*deque.Deque[string]),
 		waiterReg: newWaiterRegistry[*waiter](),
 		registry:  registry,
+		ttl:       ttl,
 	}
 }
 
@@ -62,12 +64,32 @@ func (l *listStore) getOrCreate(key string) *deque.Deque[string] {
 	return d
 }
 
+// checkExpiry performs lazy expiry check. If key is expired, deletes it and returns true.
+// Caller must NOT hold lock (this method acquires write lock).
+func (l *listStore) checkExpiry(key string) bool {
+	if !l.ttl.CheckAndDelete(key) {
+		return false
+	}
+	// Key expired — TTL already cleaned up, now delete data
+	l.mu.Lock()
+	_, existed := l.data[key]
+	if existed {
+		delete(l.data, key)
+		l.registry.Release(key) // Release while holding lock to prevent race
+	}
+	l.mu.Unlock()
+	return existed
+}
+
 type listDelivery struct {
 	w   *waiter
 	val [2]string
 }
 
 func (l *listStore) LPush(key string, values ...string) (int, error) {
+	// Lazy expiry check
+	l.checkExpiry(key)
+
 	// Register type
 	if err := l.registry.Acquire(key, TypeList); err != nil {
 		return 0, err
@@ -82,6 +104,9 @@ func (l *listStore) LPush(key string, values ...string) (int, error) {
 }
 
 func (l *listStore) RPush(key string, values ...string) (int, error) {
+	// Lazy expiry check
+	l.checkExpiry(key)
+
 	// Register type
 	if err := l.registry.Acquire(key, TypeList); err != nil {
 		return 0, err
@@ -152,6 +177,11 @@ func (l *listStore) deliver(toDeliver []listDelivery) {
 }
 
 func (l *listStore) LRange(key string, start, stop int) ([]string, error) {
+	// Lazy expiry check
+	if l.checkExpiry(key) {
+		return []string{}, nil
+	}
+
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -191,6 +221,11 @@ func (l *listStore) LRange(key string, start, stop int) ([]string, error) {
 }
 
 func (l *listStore) LLen(key string) (int, error) {
+	// Lazy expiry check
+	if l.checkExpiry(key) {
+		return 0, nil
+	}
+
 	l.mu.RLock()
 	defer l.mu.RUnlock()
 
@@ -201,6 +236,11 @@ func (l *listStore) LLen(key string) (int, error) {
 }
 
 func (l *listStore) LPop(key string, count int) ([]string, error) {
+	// Lazy expiry check
+	if l.checkExpiry(key) {
+		return []string{}, nil
+	}
+
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -228,6 +268,11 @@ func (l *listStore) LPop(key string, count int) ([]string, error) {
 }
 
 func (l *listStore) BLPop(keys []string, timeout time.Duration) (key, value string, ok bool) {
+	// Lazy expiry check for all keys
+	for _, k := range keys {
+		l.checkExpiry(k)
+	}
+
 	l.mu.Lock()
 
 	// Check all keys for existing data (priority order)
@@ -289,4 +334,60 @@ func (l *listStore) Delete(key string) bool {
 	}
 
 	return existed
+}
+
+// ForEach iterates over all lists for persistence.
+// Uses snapshot approach: briefly locks to get keys, then iterates without holding lock.
+// Keys added during iteration may be missed; keys deleted are skipped safely.
+func (l *listStore) ForEach(fn func(key string, elements []string, expiry time.Time, hasTTL bool)) {
+	// Take a quick snapshot of keys
+	l.mu.RLock()
+	keys := make([]string, 0, len(l.data))
+	for k := range l.data {
+		keys = append(keys, k)
+	}
+	l.mu.RUnlock()
+
+	// Iterate over snapshot (no lock held during callback)
+	for _, key := range keys {
+		// Skip expired
+		if l.ttl.IsExpired(key) {
+			continue
+		}
+
+		// Get data for this key (brief lock)
+		l.mu.RLock()
+		d, exists := l.data[key]
+		if !exists || d.Len() == 0 {
+			l.mu.RUnlock()
+			continue
+		}
+		elements := make([]string, 0, d.Len())
+		elements = d.Range(elements, 0, d.Len()-1)
+		l.mu.RUnlock()
+
+		expiry, hasTTL := l.ttl.Get(key)
+		fn(key, elements, expiry, hasTTL)
+	}
+}
+
+// Load adds a list during database load.
+func (l *listStore) Load(key string, elements []string, expiry time.Time, hasTTL bool) {
+	// Register type
+	if err := l.registry.Acquire(key, TypeList); err != nil {
+		return // Skip if type conflict (shouldn't happen on clean load)
+	}
+
+	l.mu.Lock()
+	d := deque.New[string]()
+	for _, elem := range elements {
+		d.PushBack(elem)
+	}
+	l.data[key] = d
+	l.mu.Unlock()
+
+	// Set TTL if applicable
+	if hasTTL {
+		l.ttl.Set(key, expiry)
+	}
 }

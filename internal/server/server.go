@@ -146,10 +146,15 @@ func StartServer() {
 		"ECHO": commands.ECHO,
 		"INFO": commands.INFO,
 
-		// String commands (use DataStore)
+		// Key commands (work on any type)
+		"DEL":    commands.MakeDEL(db),
+		"TYPE":   commands.MakeTYPE(db),
+		"EXPIRE": commands.MakeEXPIRE(db),
+		"TTL":    commands.MakeTTL(db),
+
+		// String commands
 		"SET":  commands.MakeSET(db),
 		"GET":  commands.MakeGET(db),
-		"TYPE": commands.MakeTYPE(db),
 		"INCR": commands.MakeINCR(db),
 
 		// Transaction commands
@@ -157,7 +162,7 @@ func StartServer() {
 		"DISCARD": commands.DISCARD,
 		"EXEC":    commands.EXEC,
 
-		// List commands (use DataStore)
+		// List commands
 		"LPUSH":  commands.MakeLPUSH(db),
 		"RPUSH":  commands.MakeRPUSH(db),
 		"LPOP":   commands.MakeLPOP(db),
@@ -165,7 +170,7 @@ func StartServer() {
 		"LRANGE": commands.MakeLRANGE(db),
 		"LLEN":   commands.MakeLLEN(db),
 
-		// Stream commands (use DataStore)
+		// Stream commands
 		"XADD":   commands.MakeXADD(db),
 		"XREAD":  commands.MakeXREAD(db),
 		"XRANGE": commands.MakeXRANGE(db),

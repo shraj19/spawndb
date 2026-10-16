@@ -11,7 +11,7 @@ import (
 // If LPush is O(1) amortized, time grows ~linearly with n.
 // If LPush is O(n) (slice prepend), total build is O(n^2) -> time grows ~quadratically.
 func benchBuild(n int) time.Duration {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 	key := "benchkey"
 	start := time.Now()
 	for i := 0; i < n; i++ {

@@ -84,6 +84,13 @@ type ListStore interface {
 
 	// Delete removes a list. Returns true if existed.
 	Delete(key string) bool
+
+	// ForEach iterates over all lists (for persistence).
+	// Callback receives key, elements slice, expiry time, and whether TTL is set.
+	ForEach(fn func(key string, elements []string, expiry time.Time, hasTTL bool))
+
+	// Load adds a list during database load (for persistence).
+	Load(key string, elements []string, expiry time.Time, hasTTL bool)
 }
 
 // StreamStore handles stream operations.
@@ -110,6 +117,13 @@ type StreamStore interface {
 
 	// Delete removes a stream. Returns true if existed.
 	Delete(key string) bool
+
+	// ForEach iterates over all streams (for persistence).
+	// Callback receives key, entries slice, expiry time, and whether TTL is set.
+	ForEach(fn func(key string, entries []StreamEntry, expiry time.Time, hasTTL bool))
+
+	// Load adds a stream during database load (for persistence).
+	Load(key string, entries []StreamEntry, expiry time.Time, hasTTL bool)
 }
 
 // DataStore is the facade interface providing access to all stores.
@@ -156,6 +170,15 @@ type DataStore interface {
 
 	// Exists returns true if key exists (any type).
 	Exists(key string) bool
+
+	// SetTTL sets expiry on a key. Returns false if key doesn't exist.
+	SetTTL(key string, ttl time.Duration) bool
+
+	// GetTTL returns remaining TTL for a key.
+	// Returns (-2, false) if key doesn't exist.
+	// Returns (-1, true) if key exists but has no TTL.
+	// Returns (seconds, true) if key exists and has TTL.
+	GetTTL(key string) (int64, bool)
 
 	// KeyCount returns the total number of currently stored keys across all types.
 	// Intended for metrics/observability sampling.

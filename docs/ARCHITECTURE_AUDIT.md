@@ -105,14 +105,15 @@ ReplicaConnection.writeMu  sync.Mutex   # Serializes writes per replica
 | SET | ✅ | ✅ | ✅ | With EX/PX TTL |
 | GET | ✅ | N/A | N/A | Read-only |
 | INCR | ✅ | ✅ | ✅ | |
+| DEL | ✅ | ✅ | N/A | Deletes any type |
 | TYPE | ✅ | N/A | N/A | Read-only |
-| LPUSH | ✅ | ❌ **BUG** | ❌ **BUG** | Not propagated! |
-| RPUSH | ✅ | ❌ **BUG** | ❌ **BUG** | Not propagated! |
-| LPOP | ✅ | ❌ **BUG** | ❌ **BUG** | Not propagated! |
+| LPUSH | ✅ | ✅ | ❌ **BUG** | Fixed 2026-10-16 |
+| RPUSH | ✅ | ✅ | ❌ **BUG** | Fixed 2026-10-16 |
+| LPOP | ✅ | ✅ | ❌ **BUG** | Fixed 2026-10-16 |
 | BLPOP | ✅ | N/A | N/A | Blocking read |
 | LRANGE | ✅ | N/A | N/A | Read-only |
 | LLEN | ✅ | N/A | N/A | Read-only |
-| XADD | ✅ | ❌ **BUG** | ❌ **BUG** | Not propagated! |
+| XADD | ✅ | ✅ | ❌ **BUG** | Fixed 2026-10-16, sends resolved ID |
 | XREAD | ✅ | N/A | N/A | Read-only |
 | XRANGE | ✅ | N/A | N/A | Read-only |
 | MULTI | ✅ | N/A | N/A | Transaction start |
@@ -126,11 +127,11 @@ ReplicaConnection.writeMu  sync.Mutex   # Serializes writes per replica
 
 ## 5. Critical Defects Found
 
-### 5.1 Replication: Only SET and INCR Propagate ❌
+### 5.1 Replication: Only SET and INCR Propagate ✅ FIXED
 **Severity:** HIGH  
-**Location:** `internal/commands/strings.go` has `propagateToReplicas(args)`  
-**Missing:** Lists (LPUSH, RPUSH, LPOP) and Streams (XADD) don't call it.  
-**Impact:** Replicas silently diverge from master.
+**Status:** Fixed 2026-10-16  
+**Fix:** Added `propagateToReplicas(args)` to LPUSH, RPUSH, LPOP, XADD  
+**Note:** XADD now propagates resolved ID (not `*`) to prevent replica divergence
 
 ### 5.2 Persistence: Only Strings Saved ❌
 **Severity:** HIGH  
@@ -144,14 +145,245 @@ ReplicaConnection.writeMu  sync.Mutex   # Serializes writes per replica
 **Issue:** EXEC runs commands sequentially but doesn't hold any lock during execution.  
 **Impact:** Other clients can interleave between commands in a transaction.
 
-### 5.4 DEL Command: Not Implemented
+### 5.4 DEL Command: Not Implemented ✅ FIXED
 **Severity:** MEDIUM  
-**Location:** Not registered in server.go  
-**Impact:** Cannot delete keys.
+**Status:** Fixed 2026-10-16  
+**Fix:** Implemented `MakeDEL(db)` in strings.go, registered in server.go
 
 ---
 
-## 6. Test Coverage
+## 6. Known Limitations (Future Optimization)
+
+### 6.1 Replication: Replica Re-validates Commands
+**Type:** Performance limitation (not a bug)  
+**Current behavior:** Replica receives commands and re-executes them fully, including argument validation, type checks, and all storage logic.  
+**Impact:** Redundant CPU work on replicas.
+
+**What Redis does:** Redis uses a hybrid approach where:
+1. Master validates, executes, and generates any non-deterministic values
+2. Master sends deterministic command (with resolved IDs, etc.) to replica  
+3. Replica applies with minimal validation (trusts master)
+
+**Potential fix:** Add `fromReplication bool` flag to command handlers. When `true`, skip validation and apply directly.
+
+**Complexity:** Medium — requires threading flag through command dispatch  
+**Priority:** Low — correctness issue was fixed (XADD resolved ID), this is pure optimization
+
+### 6.2 TTL Replication: Relative vs Absolute Timestamps
+**Type:** Minor timing drift (not a correctness bug for most use cases)  
+**Current behavior:** `SET key val EX 60` propagates as-is. Replica sets TTL relative to its receive time.
+
+**Example drift:**
+```
+Master:  SET key val EX 60  at T=0      → expires at T+60s
+Replica: receives at T=0.1s (100ms lag) → expires at T+60.1s
+```
+
+**Impact:** 
+- 100ms drift on 60s TTL = 0.17% error (negligible)
+- 100ms drift on 1s TTL = 10% error (noticeable for very short TTLs)
+- Reading from replica may see key ~100ms longer than master
+
+**What Redis does:** Redis also propagates relative TTL, but master actively sends DEL when keys expire. Replicas don't expire independently.
+
+**Potential fix (simpler):** Convert to absolute timestamp before replication:
+```go
+// Instead of propagating: SET key val EX 60
+// Propagate: SET key val PXAT 1697450060000  (absolute unix ms)
+```
+This requires:
+1. Implementing PXAT option in SET command
+2. Converting EX/PX to PXAT before `propagateToReplicas()`
+
+**Complexity:** Low-Medium — need PXAT support in SET, then simple conversion  
+**Priority:** Low — drift is usually negligible, Redis has same limitation
+
+### 6.3 Distributed State: TTL + Registry + Store Coordination
+**Type:** Architectural trade-off (not a bug after fix)  
+
+**Context — Redis is single-threaded:** Redis executes commands sequentially in one thread. No locks, no races, no coordination needed. The complexity below exists **only because SpawnDB chose multi-threaded execution** to explore parallelism.
+
+**Current design:** Key metadata is split across three data structures:
+```
+┌─────────────────────────────────────────────────────────────┐
+│                       DataStore                              │
+├─────────────┬─────────────┬─────────────┬──────────────────┤
+│ TTLManager  │ Registry    │ ListStore   │ StreamStore      │
+│ (expiry)    │ (key→type)  │ (key→data)  │ (key→data)       │
+│ [mutex]     │ [mutex]     │ [mutex]     │ [mutex]          │
+└─────────────┴─────────────┴─────────────┴──────────────────┘
+```
+
+**Challenge:** Lazy expiry requires coordinating deletions across all three:
+1. TTLManager.CheckAndDelete() — removes expiry entry
+2. Store.data — removes actual data  
+3. Registry — removes type binding
+
+**Race condition found and fixed (2026-10-16):**
+```
+Thread A (checkExpiry)              Thread B (LPush same key)
+──────────────────────              ─────────────────────────
+ttl.CheckAndDelete() → true         
+                                    checkExpiry() → false (TTL gone)
+                                    registry.Acquire() → registers key
+delete(l.data, key)
+registry.Release(key)               ← Would delete Thread B's registration!
+```
+
+**Fix applied:** Move `registry.Release()` inside store lock:
+```go
+l.mu.Lock()
+_, existed := l.data[key]
+if existed {
+    delete(l.data, key)
+    l.registry.Release(key)  // Atomic: delete data + unregister
+}
+l.mu.Unlock()
+```
+
+**Lock order (deadlock-free):** TTL → Store → Registry (always acquired in this order)
+
+**Alternative design (Redis approach):** Unified key entry:
+```go
+type KeyEntry struct {
+    Type   DataType
+    Expiry time.Time     // 0 = no TTL
+    Data   interface{}   // string | *Deque | *Stream
+}
+// Single map, single lock per key
+```
+
+**Trade-offs:**
+| Aspect | Current (Distributed) | Alternative (Unified) |
+|--------|----------------------|----------------------|
+| Lock contention | Lower (sharded) | Higher |
+| Race complexity | Higher | Lower |
+| Code complexity | Higher | Lower |
+| Testability | Higher (isolated stores) | Lower |
+| Type safety | Higher | Lower (interface{}) |
+
+**Decision:** Keep current design. The coordination complexity is manageable and the separation makes testing and reasoning about individual stores easier. Document the lock ordering invariant.
+
+**SpawnDB vs Redis concurrency models:**
+| Aspect | Redis | SpawnDB |
+|--------|-------|---------|
+| Command execution | Single-threaded event loop | Goroutine per connection |
+| Parallelism | None (sequential) | True parallel execution |
+| Locking | Not needed | Required everywhere |
+| Race conditions | Impossible by design | Must be carefully prevented |
+| Multi-core utilization | Limited (I/O only) | Full |
+| Code complexity | Lower | Higher |
+
+SpawnDB's multi-threaded design is intentional — it explores whether parallelism can outperform Redis's simplicity on multi-core systems.
+
+### 6.4 Persistence: Snapshot-Keys vs Full-Lock Trade-off
+**Type:** Design decision (documented 2026-10-16)
+
+**Context:** The `ForEach` method iterates over all keys for RDB persistence. Two approaches considered:
+
+**Option A: Full Lock (Simple)**
+```go
+func ForEach(fn func(...)) {
+    s.mu.RLock()
+    defer s.mu.RUnlock()  // Held entire iteration
+    for key, value := range s.data {
+        fn(key, value, ...)
+    }
+}
+```
+- ✅ Perfect point-in-time snapshot
+- ❌ Blocks ALL writes during save (O(n) lock time)
+- ❌ Save freezes database for large datasets
+
+**Option B: Snapshot-Keys (Chosen)**
+```go
+func ForEach(fn func(...)) {
+    // Brief lock: get keys only
+    s.mu.RLock()
+    keys := make([]string, 0, len(s.data))
+    for k := range s.data { keys = append(keys, k) }
+    s.mu.RUnlock()  // Released!
+
+    // Per-key brief locks
+    for _, key := range keys {
+        s.mu.RLock()
+        data := s.data[key]  // Copy
+        s.mu.RUnlock()
+        fn(key, data, ...)   // Callback without lock
+    }
+}
+```
+- ✅ Writers only blocked briefly per key (O(1) per key)
+- ✅ Save doesn't freeze database
+- ⚠️ Not a perfect snapshot:
+  - Keys added during save may be missed (acceptable: they're new)
+  - Keys deleted during save are skipped safely
+  - Keys modified get either old or new value (both valid states)
+
+**What Redis does:** Forks process for RDB save — OS copy-on-write gives perfect snapshot without blocking. Not portable (no fork on Windows), more complex.
+
+**Decision:** Use snapshot-keys approach for all stores (StringStore, ListStore, StreamStore). The "imperfect" snapshot is acceptable because:
+1. Missed new keys aren't data loss
+2. We skip expired keys on load anyway
+3. Concurrent writes during save are rare in practice
+4. Interview talking point: "Optimized persistence to not block writes"
+
+**Workload assumption:** This approach optimizes for databases that remain responsive during saves:
+- Write-heavy workloads (chat, logs, queues) — writes don't block
+- Read-heavy workloads (cache, sessions) — reads always fast
+- Large datasets — no latency spike proportional to data size
+
+**When full-lock would be better:**
+- Small datasets where save is <10ms
+- Need transactional consistency (perfect point-in-time)
+- Scheduled saves during low traffic (blocking acceptable)
+
+### 6.5 RWMutex vs Mutex Trade-off
+**Type:** Design decision (documented 2026-10-16)
+
+**Context:** SpawnDB uses `sync.RWMutex` everywhere (KeyLock, stores, registry, TTL). This has performance implications.
+
+**Performance comparison:**
+| Aspect | `sync.Mutex` | `sync.RWMutex` |
+|--------|--------------|----------------|
+| Memory | 8 bytes | 24 bytes (3x) |
+| Lock() speed | ~20ns | ~30-40ns (slower) |
+| RLock() speed | N/A | ~25-30ns |
+| Concurrent reads | ❌ No | ✅ Yes |
+
+**Trade-off:** RWMutex makes writes slower (~50-100% overhead) to enable concurrent reads.
+
+**When RWMutex hurts (write-heavy, same key):**
+```
+99% SET, 1% GET on same key:
+- Extra lock overhead on every write
+- Minimal benefit from concurrent reads
+```
+
+**When RWMutex helps (read-heavy, same key):**
+```
+99% GET, 1% SET on same key:
+- 100 concurrent GETs run in parallel (not serialized)
+- Potential 80x+ throughput improvement for reads
+```
+
+**Decision:** Use RWMutex because:
+1. Most real database workloads are read-heavy (80-95% reads typical)
+2. SpawnDB targets cache/session use cases
+3. Sharded KeyLock (256 shards) mitigates write contention across different keys
+4. Matches what other stores (StringStore, ListStore, etc.) already use
+
+**Optimal workloads for current design:**
+| Workload | Performance |
+|----------|-------------|
+| Read-heavy, same key | ⭐⭐⭐⭐⭐ Excellent |
+| Read-heavy, many keys | ⭐⭐⭐⭐⭐ Excellent |
+| Write-heavy, many keys | ⭐⭐⭐⭐ Good (sharding helps) |
+| Write-heavy, same key | ⭐⭐ Fair (unavoidable serialization) |
+
+---
+
+## 7. Test Coverage
 
 ```
 Package                    Tests    Race-safe
@@ -171,7 +403,7 @@ utilities/deque            ✅       ✅
 
 ---
 
-## 7. Component Dependencies
+## 8. Component Dependencies
 
 ```
      ┌─────────┐
@@ -202,7 +434,7 @@ utilities/deque            ✅       ✅
 
 ---
 
-## 8. Blocking Operations Audit
+## 9. Blocking Operations Audit
 
 ### BLPOP
 - **Registration:** Creates `waiter` struct, registers on all keys via `waiterReg.Add()`
@@ -219,7 +451,7 @@ utilities/deque            ✅       ✅
 
 ---
 
-## 9. Prioritized Remediation Plan
+## 10. Prioritized Remediation Plan
 
 ### Priority 1: Data Integrity (Must Fix)
 
@@ -297,7 +529,7 @@ propagateToReplicas(args)
 
 ---
 
-## 10. Summary
+## 11. Summary
 
 **What Works:**
 - Core command execution pipeline ✅
@@ -306,12 +538,15 @@ propagateToReplicas(args)
 - Lazy TTL expiration ✅
 - BLPOP/XREAD BLOCK waiter handling ✅
 - All tests pass with race detector ✅
+- Replication for all mutating commands ✅ (fixed 2026-10-16)
+- DEL command ✅ (added 2026-10-16)
 
 **What's Broken:**
-- Replication only covers SET/INCR ❌
 - Persistence only covers strings ❌
-- DEL not implemented ❌
 - Transaction isolation not guaranteed (but matches Redis) ⚠️
 
+**Known Limitations (Future Optimization):**
+- Replica re-validates commands (redundant work)
+
 **Recommended Next Action:**
-Fix replication propagation for LPUSH/RPUSH/LPOP/XADD — this is the highest-impact bug (silent data divergence).
+Fix persistence to include lists and streams — this is now the highest-impact bug (data loss on restart).

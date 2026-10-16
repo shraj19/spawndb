@@ -143,16 +143,34 @@ func (s *stringStore) Keys() []string {
 
 // ForEach iterates over all string entries.
 // Used by persistence layer for RDB saves.
-// Note: May include expired keys — persistence layer should check expiry on load.
+// Uses snapshot approach: briefly locks to get keys, then iterates without holding lock.
+// Keys added during iteration may be missed; keys deleted are skipped safely.
 func (s *stringStore) ForEach(fn func(key, value string, expiry time.Time, hasTTL bool)) {
-	// Get TTL snapshot first (one lock)
-	ttlSnapshot := s.ttl.Snapshot()
-
+	// Take a quick snapshot of keys
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	keys := make([]string, 0, len(s.data))
+	for k := range s.data {
+		keys = append(keys, k)
+	}
+	s.mu.RUnlock()
 
-	for key, value := range s.data {
-		expiry, hasTTL := ttlSnapshot[key]
+	// Iterate over snapshot (no lock held during callback)
+	for _, key := range keys {
+		// Skip expired
+		if s.ttl.IsExpired(key) {
+			continue
+		}
+
+		// Get data for this key (brief lock)
+		s.mu.RLock()
+		value, exists := s.data[key]
+		s.mu.RUnlock()
+
+		if !exists {
+			continue
+		}
+
+		expiry, hasTTL := s.ttl.Get(key)
 		fn(key, value, expiry, hasTTL)
 	}
 }

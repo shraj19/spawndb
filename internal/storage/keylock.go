@@ -7,12 +7,13 @@ import (
 
 const defaultNumShards = 256
 
-// KeyLock provides per-key locking using sharded mutexes.
-// Keys are hashed to one of N buckets; keys in the same bucket serialize.
+// KeyLock provides per-key locking using sharded RWMutexes.
+// Keys are hashed to one of N buckets; keys in the same bucket serialize writes
+// but allow concurrent reads.
 // This provides atomicity for single-key operations while allowing
 // parallelism for operations on different keys (in different buckets).
 type KeyLock struct {
-	shards []sync.Mutex
+	shards []sync.RWMutex
 	mask   uint32 // For fast modulo when numShards is power of 2
 }
 
@@ -31,21 +32,33 @@ func NewKeyLockWithShards(numShards int) *KeyLock {
 	numShards = nextPowerOf2(numShards)
 
 	return &KeyLock{
-		shards: make([]sync.Mutex, numShards),
+		shards: make([]sync.RWMutex, numShards),
 		mask:   uint32(numShards - 1),
 	}
 }
 
-// Lock acquires the lock for a given key.
+// Lock acquires an exclusive (write) lock for a given key.
 func (kl *KeyLock) Lock(key string) {
 	bucket := kl.bucket(key)
 	kl.shards[bucket].Lock()
 }
 
-// Unlock releases the lock for a given key.
+// Unlock releases an exclusive (write) lock for a given key.
 func (kl *KeyLock) Unlock(key string) {
 	bucket := kl.bucket(key)
 	kl.shards[bucket].Unlock()
+}
+
+// RLock acquires a shared (read) lock for a given key.
+func (kl *KeyLock) RLock(key string) {
+	bucket := kl.bucket(key)
+	kl.shards[bucket].RLock()
+}
+
+// RUnlock releases a shared (read) lock for a given key.
+func (kl *KeyLock) RUnlock(key string) {
+	bucket := kl.bucket(key)
+	kl.shards[bucket].RUnlock()
 }
 
 // bucket returns the shard index for a key using FNV-1a hash.

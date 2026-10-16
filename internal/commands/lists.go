@@ -29,6 +29,9 @@ func MakeRPUSH(db storage.DataStore) core.CommandHandler {
 			return resp.Error(err.Error())
 		}
 
+		// Replicate to replicas
+		propagateToReplicas(args)
+
 		return resp.Integer(int64(n))
 	}
 }
@@ -50,6 +53,9 @@ func MakeLPUSH(db storage.DataStore) core.CommandHandler {
 		if err != nil {
 			return resp.Error(err.Error())
 		}
+
+		// Replicate to replicas
+		propagateToReplicas(args)
 
 		return resp.Integer(int64(n))
 	}
@@ -125,6 +131,11 @@ func MakeLPOP(db storage.DataStore) core.CommandHandler {
 		}
 		if err != nil {
 			return resp.Error(err.Error())
+		}
+
+		// Replicate to replicas (only if we actually popped something)
+		if len(items) > 0 {
+			propagateToReplicas(args)
 		}
 
 		if len(items) == 0 {

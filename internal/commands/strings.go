@@ -83,24 +83,6 @@ func MakeGET(db storage.DataStore) core.CommandHandler {
 	}
 }
 
-// MakeTYPE creates a TYPE command handler with injected DataStore.
-func MakeTYPE(db storage.DataStore) core.CommandHandler {
-	return func(args []string, client *core.Client) string {
-		if len(args) != 2 {
-			return resp.Error("wrong number of arguments for 'type'")
-		}
-
-		key := args[1]
-		typ, exists := db.Type(key)
-
-		if !exists {
-			return resp.SimpleString("none")
-		}
-
-		return resp.SimpleString(typ.String())
-	}
-}
-
 // MakeINCR creates an INCR command handler with injected DataStore.
 func MakeINCR(db storage.DataStore) core.CommandHandler {
 	return func(args []string, client *core.Client) string {

@@ -86,7 +86,7 @@ func TestStringStore_WrongType(t *testing.T) {
 	ttl := NewTTLManager()
 	reg := NewRegistry(ttl)
 	strings := NewStringStore(reg, ttl)
-	lists := NewListStore(reg)
+	lists := NewListStore(reg, ttl)
 
 	// Create a list
 	lists.LPush("mykey", "item1")

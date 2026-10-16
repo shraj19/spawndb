@@ -6,17 +6,17 @@ import (
 	"time"
 )
 
-func newStreamStoreWithDeps() (StreamStore, Registry) {
+func newStreamStoreWithDeps() (StreamStore, Registry, TTLManager) {
 	ttl := NewTTLManager()
 	reg := NewRegistry(ttl)
-	store := NewStreamStore(reg)
-	return store, reg
+	store := NewStreamStore(reg, ttl)
+	return store, reg, ttl
 }
 
 // --- XAdd Tests ---
 
 func TestStreamStore_XAdd_AutoID(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	id, err := store.XAdd("stream1", "*", map[string]string{"field": "value"})
 	if err != nil {
@@ -35,7 +35,7 @@ func TestStreamStore_XAdd_AutoID(t *testing.T) {
 }
 
 func TestStreamStore_XAdd_ExplicitID(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	id, err := store.XAdd("stream1", "1000-0", map[string]string{"f": "v"})
 	if err != nil || id != "1000-0" {
@@ -62,7 +62,7 @@ func TestStreamStore_XAdd_ExplicitID(t *testing.T) {
 }
 
 func TestStreamStore_XAdd_PartialAutoID(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	// First entry: 1000-*  → 1000-0
 	id, err := store.XAdd("stream1", "1000-*", map[string]string{"f": "v"})
@@ -90,7 +90,7 @@ func TestStreamStore_XAdd_PartialAutoID(t *testing.T) {
 }
 
 func TestStreamStore_XAdd_ZeroID(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	// 0-0 is never valid
 	_, err := store.XAdd("stream1", "0-0", map[string]string{"f": "v"})
@@ -105,7 +105,7 @@ func TestStreamStore_XAdd_ZeroID(t *testing.T) {
 	}
 
 	// 0-* on empty stream should give 0-1
-	store2, _ := newStreamStoreWithDeps()
+	store2, _, _ := newStreamStoreWithDeps()
 	id, err = store2.XAdd("stream2", "0-*", map[string]string{"f": "v"})
 	if err != nil || id != "0-1" {
 		t.Errorf("expected 0-1 for 0-* on empty stream, got %s, err=%v", id, err)
@@ -113,7 +113,7 @@ func TestStreamStore_XAdd_ZeroID(t *testing.T) {
 }
 
 func TestStreamStore_XAdd_InvalidID(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	tests := []struct {
 		id string
@@ -137,7 +137,7 @@ func TestStreamStore_XAdd_WrongType(t *testing.T) {
 	ttl := NewTTLManager()
 	reg := NewRegistry(ttl)
 	strings := NewStringStore(reg, ttl)
-	streams := NewStreamStore(reg)
+	streams := NewStreamStore(reg, ttl)
 
 	// Create a string
 	strings.Set("mykey", "value")
@@ -152,7 +152,7 @@ func TestStreamStore_XAdd_WrongType(t *testing.T) {
 // --- XRange Tests ---
 
 func TestStreamStore_XRange(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	// Add entries
 	store.XAdd("stream1", "1-0", map[string]string{"a": "1"})
@@ -188,7 +188,7 @@ func TestStreamStore_XRange(t *testing.T) {
 }
 
 func TestStreamStore_XRange_NonExistent(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	entries, err := store.XRange("nostream", "-", "+")
 	if err != nil || len(entries) != 0 {
@@ -197,7 +197,7 @@ func TestStreamStore_XRange_NonExistent(t *testing.T) {
 }
 
 func TestStreamStore_XRange_ReturnsCopy(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	store.XAdd("stream1", "1-0", map[string]string{"f": "original"})
 
@@ -214,7 +214,7 @@ func TestStreamStore_XRange_ReturnsCopy(t *testing.T) {
 // --- XRead Tests ---
 
 func TestStreamStore_XRead(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	store.XAdd("stream1", "1-0", map[string]string{"a": "1"})
 	store.XAdd("stream1", "2-0", map[string]string{"b": "2"})
@@ -240,7 +240,7 @@ func TestStreamStore_XRead(t *testing.T) {
 }
 
 func TestStreamStore_XRead_MultipleStreams(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	store.XAdd("s1", "1-0", map[string]string{"f": "v"})
 	store.XAdd("s2", "1-0", map[string]string{"f": "v"})
@@ -259,7 +259,7 @@ func TestStreamStore_XRead_MultipleStreams(t *testing.T) {
 // --- XReadBlock Tests ---
 
 func TestStreamStore_XReadBlock_Immediate(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	store.XAdd("stream1", "1-0", map[string]string{"f": "v"})
 
@@ -273,7 +273,7 @@ func TestStreamStore_XReadBlock_Immediate(t *testing.T) {
 }
 
 func TestStreamStore_XReadBlock_DollarID(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	store.XAdd("stream1", "1-0", map[string]string{"f": "v"})
 
@@ -302,7 +302,7 @@ func TestStreamStore_XReadBlock_DollarID(t *testing.T) {
 }
 
 func TestStreamStore_XReadBlock_Blocking(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	done := make(chan struct{})
 
@@ -327,7 +327,7 @@ func TestStreamStore_XReadBlock_Blocking(t *testing.T) {
 }
 
 func TestStreamStore_XReadBlock_MultiStream(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	done := make(chan struct{})
 
@@ -354,7 +354,7 @@ func TestStreamStore_XReadBlock_MultiStream(t *testing.T) {
 }
 
 func TestStreamStore_XReadBlock_Timeout(t *testing.T) {
-	store, _ := newStreamStoreWithDeps()
+	store, _, _ := newStreamStoreWithDeps()
 
 	start := time.Now()
 	result, err := store.XReadBlock([]string{"empty"}, []string{"0-0"}, 100*time.Millisecond)
@@ -374,7 +374,7 @@ func TestStreamStore_XReadBlock_Timeout(t *testing.T) {
 // --- Delete Tests ---
 
 func TestStreamStore_Delete(t *testing.T) {
-	store, reg := newStreamStoreWithDeps()
+	store, reg, _ := newStreamStoreWithDeps()
 
 	store.XAdd("stream1", "1-0", map[string]string{"f": "v"})
 
@@ -402,7 +402,7 @@ func TestStreamStore_Delete(t *testing.T) {
 // used to call close(w.Done) twice → panic.
 func TestStreamStore_XReadBlock_MultiKeyNoPanic(t *testing.T) {
 	for iter := 0; iter < 20; iter++ {
-		store, _ := newStreamStoreWithDeps()
+		store, _, _ := newStreamStoreWithDeps()
 
 		// Create streams first
 		store.XAdd("stream_a", "1-0", map[string]string{"init": "a"})
@@ -445,4 +445,93 @@ func TestStreamStore_XReadBlock_MultiKeyNoPanic(t *testing.T) {
 		}
 	}
 	// If we get here without panic, the fix works
+}
+
+// --- Expiry Tests ---
+
+func TestStreamStore_ExpiryOnXAdd(t *testing.T) {
+	store, _, ttl := newStreamStoreWithDeps()
+
+	// Create a stream and set TTL
+	store.XAdd("mystream", "*", map[string]string{"f": "v1"})
+	ttl.Set("mystream", time.Now().Add(-1*time.Second)) // Already expired
+
+	// XAdd on expired key should create new stream
+	id, err := store.XAdd("mystream", "*", map[string]string{"f": "v2"})
+	if err != nil || id == "" {
+		t.Errorf("expected new stream entry, got id=%s, err=%v", id, err)
+	}
+
+	// Should only have the new entry
+	entries, _ := store.XRange("mystream", "-", "+")
+	if len(entries) != 1 || entries[0].Fields["f"] != "v2" {
+		t.Errorf("expected 1 entry with f=v2, got %v", entries)
+	}
+}
+
+func TestStreamStore_ExpiryOnXRange(t *testing.T) {
+	store, _, ttl := newStreamStoreWithDeps()
+
+	store.XAdd("mystream", "*", map[string]string{"f": "v"})
+	ttl.Set("mystream", time.Now().Add(-1*time.Second))
+
+	entries, err := store.XRange("mystream", "-", "+")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("expected empty for expired stream, got %v", entries)
+	}
+}
+
+func TestStreamStore_ExpiryOnXRead(t *testing.T) {
+	store, _, ttl := newStreamStoreWithDeps()
+
+	store.XAdd("mystream", "*", map[string]string{"f": "v"})
+	ttl.Set("mystream", time.Now().Add(-1*time.Second))
+
+	result := store.XRead([]string{"mystream"}, []string{"0"})
+	if len(result) != 0 {
+		t.Errorf("expected empty for expired stream, got %v", result)
+	}
+}
+
+func TestStreamStore_ForEachSkipsExpired(t *testing.T) {
+	store, _, ttl := newStreamStoreWithDeps()
+
+	store.XAdd("stream1", "*", map[string]string{"f": "v1"})
+	store.XAdd("stream2", "*", map[string]string{"f": "v2"})
+	ttl.Set("stream1", time.Now().Add(-1*time.Second)) // Expire stream1
+
+	var keys []string
+	store.ForEach(func(key string, entries []StreamEntry, expiry time.Time, hasTTL bool) {
+		keys = append(keys, key)
+	})
+
+	if len(keys) != 1 || keys[0] != "stream2" {
+		t.Errorf("expected only stream2, got %v", keys)
+	}
+}
+
+func TestStreamStore_LoadWithTTL(t *testing.T) {
+	store, _, ttl := newStreamStoreWithDeps()
+
+	expiry := time.Now().Add(1 * time.Hour)
+	entries := []StreamEntry{
+		{ID: "1-0", Fields: map[string]string{"a": "1"}},
+		{ID: "2-0", Fields: map[string]string{"b": "2"}},
+	}
+	store.Load("mystream", entries, expiry, true)
+
+	// Verify data
+	result, _ := store.XRange("mystream", "-", "+")
+	if len(result) != 2 {
+		t.Errorf("expected 2 entries, got %v", result)
+	}
+
+	// Verify TTL was set
+	remaining, hasTTL := ttl.Remaining("mystream")
+	if !hasTTL || remaining < 59*time.Minute {
+		t.Errorf("expected TTL ~1h, got remaining=%v, hasTTL=%v", remaining, hasTTL)
+	}
 }

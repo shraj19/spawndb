@@ -24,15 +24,17 @@ type streamStore struct {
 	data      map[string]*Stream
 	waiterReg *waiterRegistry[*StreamWaiter]
 	registry  Registry
+	ttl       TTLManager
 	mu        sync.RWMutex
 }
 
 // NewStreamStore creates a new stream store.
-func NewStreamStore(registry Registry) StreamStore {
+func NewStreamStore(registry Registry, ttl TTLManager) StreamStore {
 	return &streamStore{
 		data:      make(map[string]*Stream),
 		waiterReg: newWaiterRegistry[*StreamWaiter](),
 		registry:  registry,
+		ttl:       ttl,
 	}
 }
 
@@ -45,7 +47,27 @@ func streamWaiterKeys(w *StreamWaiter) []string {
 	return keys
 }
 
+// checkExpiry performs lazy expiry check. If key is expired, deletes it and returns true.
+// Caller must NOT hold lock (this method acquires write lock).
+func (s *streamStore) checkExpiry(key string) bool {
+	if !s.ttl.CheckAndDelete(key) {
+		return false
+	}
+	// Key expired — TTL already cleaned up, now delete data
+	s.mu.Lock()
+	_, existed := s.data[key]
+	if existed {
+		delete(s.data, key)
+		s.registry.Release(key) // Release while holding lock to prevent race
+	}
+	s.mu.Unlock()
+	return existed
+}
+
 func (s *streamStore) XAdd(key, inputID string, fields map[string]string) (string, error) {
+	// Lazy expiry check
+	s.checkExpiry(key)
+
 	// Register type
 	if err := s.registry.Acquire(key, TypeStream); err != nil {
 		return "", err
@@ -77,6 +99,11 @@ func (s *streamStore) XAdd(key, inputID string, fields map[string]string) (strin
 }
 
 func (s *streamStore) XRange(key, startID, endID string) ([]StreamEntry, error) {
+	// Lazy expiry check
+	if s.checkExpiry(key) {
+		return []StreamEntry{}, nil
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -115,6 +142,11 @@ func (s *streamStore) XRange(key, startID, endID string) ([]StreamEntry, error) 
 }
 
 func (s *streamStore) XRead(keys, ids []string) map[string][]StreamEntry {
+	// Lazy expiry check for all keys
+	for _, key := range keys {
+		s.checkExpiry(key)
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -140,6 +172,11 @@ func (s *streamStore) XRead(keys, ids []string) map[string][]StreamEntry {
 }
 
 func (s *streamStore) XReadBlock(keys, ids []string, timeout time.Duration) (map[string][]StreamEntry, error) {
+	// Lazy expiry check for all keys
+	for _, key := range keys {
+		s.checkExpiry(key)
+	}
+
 	s.mu.Lock()
 
 	// Resolve "$" IDs to actual last IDs (must be under lock for atomicity)
@@ -215,6 +252,75 @@ func (s *streamStore) Delete(key string) bool {
 	}
 
 	return existed
+}
+
+// ForEach iterates over all streams for persistence.
+// Uses snapshot approach: briefly locks to get keys, then iterates without holding lock.
+// Keys added during iteration may be missed; keys deleted are skipped safely.
+func (s *streamStore) ForEach(fn func(key string, entries []StreamEntry, expiry time.Time, hasTTL bool)) {
+	// Take a quick snapshot of keys
+	s.mu.RLock()
+	keys := make([]string, 0, len(s.data))
+	for k := range s.data {
+		keys = append(keys, k)
+	}
+	s.mu.RUnlock()
+
+	// Iterate over snapshot (no lock held during callback)
+	for _, key := range keys {
+		// Skip expired
+		if s.ttl.IsExpired(key) {
+			continue
+		}
+
+		// Get data for this key (brief lock)
+		s.mu.RLock()
+		stream, exists := s.data[key]
+		if !exists || len(stream.Entries) == 0 {
+			s.mu.RUnlock()
+			continue
+		}
+
+		// Deep copy entries while holding lock
+		entries := make([]StreamEntry, len(stream.Entries))
+		for i, e := range stream.Entries {
+			entries[i] = StreamEntry{
+				ID:     e.ID,
+				Fields: make(map[string]string, len(e.Fields)),
+			}
+			for k, v := range e.Fields {
+				entries[i].Fields[k] = v
+			}
+		}
+		s.mu.RUnlock()
+
+		expiry, hasTTL := s.ttl.Get(key)
+		fn(key, entries, expiry, hasTTL)
+	}
+}
+
+// Load adds a stream during database load.
+func (s *streamStore) Load(key string, entries []StreamEntry, expiry time.Time, hasTTL bool) {
+	// Register type
+	if err := s.registry.Acquire(key, TypeStream); err != nil {
+		return // Skip if type conflict (shouldn't happen on clean load)
+	}
+
+	s.mu.Lock()
+	stream := &Stream{
+		Entries: entries,
+		Index:   make(map[string]int, len(entries)),
+	}
+	for i, e := range entries {
+		stream.Index[e.ID] = i
+	}
+	s.data[key] = stream
+	s.mu.Unlock()
+
+	// Set TTL if applicable
+	if hasTTL {
+		s.ttl.Set(key, expiry)
+	}
 }
 
 // --- Internal helpers ---

@@ -39,6 +39,15 @@ func MakeXADD(db storage.DataStore) core.CommandHandler {
 			return resp.Error(err.Error())
 		}
 
+		// Replicate with RESOLVED ID (not "*") so replica has identical stream
+		// Build: XADD streamKey resolvedID field1 value1 field2 value2 ...
+		replicateArgs := make([]string, 0, len(args))
+		replicateArgs = append(replicateArgs, "XADD", streamKey, id) // Use resolved ID
+		for i := 3; i < len(args); i++ {
+			replicateArgs = append(replicateArgs, args[i])
+		}
+		propagateToReplicas(replicateArgs)
+
 		return resp.BulkString(id)
 	}
 }

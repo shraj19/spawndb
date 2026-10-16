@@ -6,15 +6,15 @@ import (
 	"time"
 )
 
-func newListStoreWithDeps() (ListStore, Registry) {
+func newListStoreWithDeps() (ListStore, Registry, TTLManager) {
 	ttl := NewTTLManager()
 	reg := NewRegistry(ttl)
-	store := NewListStore(reg)
-	return store, reg
+	store := NewListStore(reg, ttl)
+	return store, reg, ttl
 }
 
 func TestListStore_RPush(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	n, err := store.RPush("list1", "a", "b", "c")
 	if err != nil || n != 3 {
@@ -28,7 +28,7 @@ func TestListStore_RPush(t *testing.T) {
 }
 
 func TestListStore_LPush(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	store.RPush("list1", "c")
 	n, err := store.LPush("list1", "a", "b")
@@ -44,7 +44,7 @@ func TestListStore_LPush(t *testing.T) {
 }
 
 func TestListStore_LRange(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 	store.RPush("list1", "a", "b", "c", "d", "e")
 
 	tests := []struct {
@@ -80,7 +80,7 @@ func TestListStore_LRange(t *testing.T) {
 }
 
 func TestListStore_LRange_NonExistent(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	items, err := store.LRange("nolist", 0, -1)
 	if err != nil || len(items) != 0 {
@@ -89,7 +89,7 @@ func TestListStore_LRange_NonExistent(t *testing.T) {
 }
 
 func TestListStore_LRange_ReturnsCopy(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 	store.RPush("list1", "a", "b", "c")
 
 	items, _ := store.LRange("list1", 0, -1)
@@ -103,7 +103,7 @@ func TestListStore_LRange_ReturnsCopy(t *testing.T) {
 }
 
 func TestListStore_LLen(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	// Empty
 	n, _ := store.LLen("nolist")
@@ -119,7 +119,7 @@ func TestListStore_LLen(t *testing.T) {
 }
 
 func TestListStore_LPop(t *testing.T) {
-	store, reg := newListStoreWithDeps()
+	store, reg, _ := newListStoreWithDeps()
 	store.RPush("list1", "a", "b", "c")
 
 	// Pop 1
@@ -145,7 +145,7 @@ func TestListStore_LPop(t *testing.T) {
 }
 
 func TestListStore_LPop_MoreThanExists(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 	store.RPush("list1", "a", "b")
 
 	items, _ := store.LPop("list1", 10)
@@ -155,7 +155,7 @@ func TestListStore_LPop_MoreThanExists(t *testing.T) {
 }
 
 func TestListStore_LPop_NonExistent(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	items, err := store.LPop("nolist", 1)
 	if err != nil || len(items) != 0 {
@@ -164,7 +164,7 @@ func TestListStore_LPop_NonExistent(t *testing.T) {
 }
 
 func TestListStore_Delete(t *testing.T) {
-	store, reg := newListStoreWithDeps()
+	store, reg, _ := newListStoreWithDeps()
 	store.RPush("list1", "a", "b")
 
 	if !store.Delete("list1") {
@@ -184,7 +184,7 @@ func TestListStore_WrongType(t *testing.T) {
 	ttl := NewTTLManager()
 	reg := NewRegistry(ttl)
 	strings := NewStringStore(reg, ttl)
-	lists := NewListStore(reg)
+	lists := NewListStore(reg, ttl)
 
 	// Create a string
 	strings.Set("mykey", "value")
@@ -204,7 +204,7 @@ func TestListStore_WrongType(t *testing.T) {
 // --- BLPop Tests ---
 
 func TestListStore_BLPop_Immediate(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 	store.RPush("list1", "item1")
 
 	key, val, ok := store.BLPop([]string{"list1"}, 1*time.Second)
@@ -214,7 +214,7 @@ func TestListStore_BLPop_Immediate(t *testing.T) {
 }
 
 func TestListStore_BLPop_Priority(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	// Data in low priority list only
 	store.RPush("low", "low_item")
@@ -227,7 +227,7 @@ func TestListStore_BLPop_Priority(t *testing.T) {
 }
 
 func TestListStore_BLPop_PriorityOrder(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	// Data in both high and low
 	store.RPush("high", "high_item")
@@ -241,7 +241,7 @@ func TestListStore_BLPop_PriorityOrder(t *testing.T) {
 }
 
 func TestListStore_BLPop_Blocking(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	done := make(chan struct{})
 
@@ -270,7 +270,7 @@ func TestListStore_BLPop_Blocking(t *testing.T) {
 }
 
 func TestListStore_BLPop_MultiKeyBlocking(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	done := make(chan struct{})
 
@@ -299,7 +299,7 @@ func TestListStore_BLPop_MultiKeyBlocking(t *testing.T) {
 }
 
 func TestListStore_BLPop_Timeout(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	start := time.Now()
 	_, _, ok := store.BLPop([]string{"empty"}, 100*time.Millisecond)
@@ -315,7 +315,7 @@ func TestListStore_BLPop_Timeout(t *testing.T) {
 }
 
 func TestListStore_BLPop_WaiterCleanupOnTimeout(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	// Timeout immediately
 	store.BLPop([]string{"key1", "key2"}, 1*time.Millisecond)
@@ -347,7 +347,7 @@ func TestListStore_BLPop_WaiterCleanupOnTimeout(t *testing.T) {
 func TestListStore_BLPop_MultiKeyDeadlock(t *testing.T) {
 	// Run multiple iterations to increase chance of hitting the race
 	for iter := 0; iter < 10; iter++ {
-		store, _ := newListStoreWithDeps()
+		store, _, _ := newListStoreWithDeps()
 
 		// Setup: BLPop waiting on both "a" and "b"
 		consumerDone := make(chan struct{})
@@ -406,7 +406,7 @@ func TestListStore_BLPop_MultiKeyDeadlock(t *testing.T) {
 // TestListStore_BLPop_DoubleDelivery tests that a waiter on multiple keys
 // only receives ONE value, not values from multiple keys.
 func TestListStore_BLPop_DoubleDelivery(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	received := make(chan [2]string, 10) // Buffer to catch multiple deliveries
 
@@ -458,7 +458,7 @@ func TestListStore_BLPop_DoubleDelivery(t *testing.T) {
 // Redis: RPUSH returns the length of the list AFTER the push.
 // Elements delivered directly to waiters are NOT in the list.
 func TestListStore_RPush_ReturnCount(t *testing.T) {
-	store, _ := newListStoreWithDeps()
+	store, _, _ := newListStoreWithDeps()
 
 	// Setup: BLPop waiting
 	consumerDone := make(chan struct{})
@@ -479,5 +479,106 @@ func TestListStore_RPush_ReturnCount(t *testing.T) {
 	llen, _ := store.LLen("mylist")
 	if n != llen {
 		t.Errorf("RPUSH returned %d but LLEN is %d (should match for Redis compat)", n, llen)
+	}
+}
+
+// --- Expiry Tests ---
+
+func TestListStore_ExpiryOnLPush(t *testing.T) {
+	store, _, ttl := newListStoreWithDeps()
+
+	// Create a list and set TTL
+	store.LPush("mylist", "a", "b")
+	ttl.Set("mylist", time.Now().Add(-1*time.Second)) // Already expired
+
+	// LPush on expired key should create new list
+	n, err := store.LPush("mylist", "x")
+	if err != nil || n != 1 {
+		t.Errorf("expected new list with 1 element, got n=%d, err=%v", n, err)
+	}
+
+	// Original elements should be gone
+	items, _ := store.LRange("mylist", 0, -1)
+	if len(items) != 1 || items[0] != "x" {
+		t.Errorf("expected [x], got %v", items)
+	}
+}
+
+func TestListStore_ExpiryOnLRange(t *testing.T) {
+	store, _, ttl := newListStoreWithDeps()
+
+	// Create a list
+	store.LPush("mylist", "a", "b", "c")
+
+	// Set expired TTL
+	ttl.Set("mylist", time.Now().Add(-1*time.Second))
+
+	// LRange on expired key should return empty
+	items, err := store.LRange("mylist", 0, -1)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(items) != 0 {
+		t.Errorf("expected empty slice for expired key, got %v", items)
+	}
+}
+
+func TestListStore_ExpiryOnLLen(t *testing.T) {
+	store, _, ttl := newListStoreWithDeps()
+
+	store.LPush("mylist", "a", "b", "c")
+	ttl.Set("mylist", time.Now().Add(-1*time.Second))
+
+	n, err := store.LLen("mylist")
+	if err != nil || n != 0 {
+		t.Errorf("expected 0 for expired key, got n=%d, err=%v", n, err)
+	}
+}
+
+func TestListStore_ExpiryOnLPop(t *testing.T) {
+	store, _, ttl := newListStoreWithDeps()
+
+	store.LPush("mylist", "a", "b", "c")
+	ttl.Set("mylist", time.Now().Add(-1*time.Second))
+
+	items, err := store.LPop("mylist", 2)
+	if err != nil || len(items) != 0 {
+		t.Errorf("expected empty for expired key, got items=%v, err=%v", items, err)
+	}
+}
+
+func TestListStore_ForEachSkipsExpired(t *testing.T) {
+	store, _, ttl := newListStoreWithDeps()
+
+	store.LPush("list1", "a")
+	store.LPush("list2", "b")
+	ttl.Set("list1", time.Now().Add(-1*time.Second)) // Expire list1
+
+	var keys []string
+	store.ForEach(func(key string, elements []string, expiry time.Time, hasTTL bool) {
+		keys = append(keys, key)
+	})
+
+	if len(keys) != 1 || keys[0] != "list2" {
+		t.Errorf("expected only list2, got %v", keys)
+	}
+}
+
+func TestListStore_LoadWithTTL(t *testing.T) {
+	store, _, ttl := newListStoreWithDeps()
+
+	expiry := time.Now().Add(1 * time.Hour)
+	store.Load("mylist", []string{"a", "b", "c"}, expiry, true)
+
+	// Verify data
+	items, _ := store.LRange("mylist", 0, -1)
+	if len(items) != 3 {
+		t.Errorf("expected 3 items, got %v", items)
+	}
+
+	// Verify TTL was set
+	remaining, hasTTL := ttl.Remaining("mylist")
+	if !hasTTL || remaining < 59*time.Minute {
+		t.Errorf("expected TTL ~1h, got remaining=%v, hasTTL=%v", remaining, hasTTL)
 	}
 }

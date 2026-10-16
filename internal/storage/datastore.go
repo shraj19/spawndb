@@ -22,8 +22,8 @@ func NewDataStore() DataStore {
 
 	return &dataStore{
 		strings:  NewStringStore(registry, ttl),
-		lists:    NewListStore(registry),
-		streams:  NewStreamStore(registry),
+		lists:    NewListStore(registry, ttl),
+		streams:  NewStreamStore(registry, ttl),
 		registry: registry,
 		ttl:      ttl,
 		keyLock:  NewKeyLock(),
@@ -68,8 +68,8 @@ func (d *dataStore) SetWithTTL(key, value string, ttl time.Duration) error {
 
 // Get atomically gets a string value.
 func (d *dataStore) Get(key string) (string, bool) {
-	d.keyLock.Lock(key)
-	defer d.keyLock.Unlock(key)
+	d.keyLock.RLock(key)
+	defer d.keyLock.RUnlock(key)
 	return d.strings.Get(key)
 }
 
@@ -105,15 +105,15 @@ func (d *dataStore) LPop(key string, count int) ([]string, error) {
 
 // LRange atomically gets a range from a list.
 func (d *dataStore) LRange(key string, start, stop int) ([]string, error) {
-	d.keyLock.Lock(key)
-	defer d.keyLock.Unlock(key)
+	d.keyLock.RLock(key)
+	defer d.keyLock.RUnlock(key)
 	return d.lists.LRange(key, start, stop)
 }
 
 // LLen atomically gets the length of a list.
 func (d *dataStore) LLen(key string) (int, error) {
-	d.keyLock.Lock(key)
-	defer d.keyLock.Unlock(key)
+	d.keyLock.RLock(key)
+	defer d.keyLock.RUnlock(key)
 	return d.lists.LLen(key)
 }
 
@@ -137,8 +137,8 @@ func (d *dataStore) XAdd(key, id string, fields map[string]string) (string, erro
 
 // XRange atomically gets a range from a stream.
 func (d *dataStore) XRange(key, start, end string) ([]StreamEntry, error) {
-	d.keyLock.Lock(key)
-	defer d.keyLock.Unlock(key)
+	d.keyLock.RLock(key)
+	defer d.keyLock.RUnlock(key)
 	return d.streams.XRange(key, start, end)
 }
 
@@ -181,15 +181,15 @@ func (d *dataStore) Delete(key string) bool {
 
 // Type atomically returns the type of a key.
 func (d *dataStore) Type(key string) (DataType, bool) {
-	d.keyLock.Lock(key)
-	defer d.keyLock.Unlock(key)
+	d.keyLock.RLock(key)
+	defer d.keyLock.RUnlock(key)
 	return d.registry.Type(key)
 }
 
 // Exists atomically checks if key exists (any type).
 func (d *dataStore) Exists(key string) bool {
-	d.keyLock.Lock(key)
-	defer d.keyLock.Unlock(key)
+	d.keyLock.RLock(key)
+	defer d.keyLock.RUnlock(key)
 	_, exists := d.registry.Type(key)
 	return exists
 }
@@ -201,4 +201,41 @@ func (d *dataStore) KeyCount() int {
 	return len(d.registry.Keys(TypeString)) +
 		len(d.registry.Keys(TypeList)) +
 		len(d.registry.Keys(TypeStream))
+}
+
+// SetTTL sets expiry on a key. Returns false if key doesn't exist.
+func (d *dataStore) SetTTL(key string, ttl time.Duration) bool {
+	d.keyLock.Lock(key)
+	defer d.keyLock.Unlock(key)
+
+	// Check if key exists (triggers lazy expiry)
+	_, exists := d.registry.Type(key)
+	if !exists {
+		return false
+	}
+
+	d.ttl.SetTTL(key, ttl)
+	return true
+}
+
+// GetTTL returns remaining TTL for a key.
+// Returns (-2, false) if key doesn't exist.
+// Returns (-1, true) if key exists but has no TTL.
+// Returns (seconds, true) if key exists and has TTL.
+func (d *dataStore) GetTTL(key string) (int64, bool) {
+	d.keyLock.RLock(key)
+	defer d.keyLock.RUnlock(key)
+
+	// Check if key exists (triggers lazy expiry)
+	_, exists := d.registry.Type(key)
+	if !exists {
+		return -2, false
+	}
+
+	remaining, hasTTL := d.ttl.Remaining(key)
+	if !hasTTL {
+		return -1, true // key exists, no TTL
+	}
+
+	return int64(remaining.Seconds()), true
 }
