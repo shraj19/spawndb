@@ -6,19 +6,30 @@ A high-performance, concurrent, in-memory key-value database written in Go. Impl
 
 ## Performance
 
-Benchmarked against Redis 6 on AWS EC2 (m7i-flex.large, localhost):
+Benchmarked against Redis 6 on AWS EC2 m7i-flex.large (3 separate instances for fair comparison):
 
-| Scenario | spawndb | Redis | Ratio |
-|----------|---------|-------|-------|
-| Basic ops (SET/GET/INCR) | 150k ops/s | 157k ops/s | **96%** |
-| List ops (LPUSH/LPOP) | 157k ops/s | 156k ops/s | **100%** |
-| High concurrency (200 clients) | 140k ops/s | 147k ops/s | **95%** |
-| Large values (10KB) | 55-91k ops/s | 90-107k ops/s | 61-84% |
-| Pipelining (P=16) | 230k ops/s | 1.4M ops/s | 17% |
+| Scenario | SpawnDB | Redis | Winner |
+|----------|---------|-------|--------|
+| SET (50 clients) | 221K ops/s | 148K ops/s | **SpawnDB +49%** |
+| GET (50 clients) | 238K ops/s | 152K ops/s | **SpawnDB +56%** |
+| LPUSH/RPUSH | 227-239K ops/s | 147-154K ops/s | **SpawnDB +50%** |
+| LRANGE (100 elements) | 103K ops/s | 105K ops/s | **Tie** |
+| LRANGE (600 elements) | 22K ops/s | 24K ops/s | Redis +9% |
+| Pipelining (P=16) | 775K ops/s | 1.9M ops/s | Redis 2.4x |
 
-**spawndb achieves 95-100% of Redis performance on core operations.**
+### Why SpawnDB is Faster (on single operations)
 
-See [`benchmark-results/`](benchmark-results/) for full methodology and raw data.
+SpawnDB outperforms Redis on simple operations because it's simpler:
+
+1. **No feature tax** — Redis checks ACLs, tracks memory, evaluates keyspace notifications, and more on every command. SpawnDB just executes.
+2. **Goroutine efficiency** — At moderate concurrency, Go's goroutine-per-connection has less overhead than Redis's event loop fd scanning.
+3. **Shorter code path** — Fewer layers between network read and storage access.
+
+**When Redis wins:** High pipelining (event loop batches efficiently), extreme concurrency (single-threaded = no locks), and any production requirement (durability, cluster, operational tooling).
+
+This is not "SpawnDB > Redis." It's "minimal implementations win micro-benchmarks."
+
+See [`benchmark-results/`](benchmark-results/) and [`docs/ARCHITECTURE_AUDIT.md`](docs/ARCHITECTURE_AUDIT.md) for full analysis.
 
 ## Features
 

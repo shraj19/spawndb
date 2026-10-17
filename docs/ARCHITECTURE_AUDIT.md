@@ -420,6 +420,86 @@ for {
 | Network packets | 100 | 1-few |
 | Latency (100 cmds, 1ms RTT) | ~100ms | ~1ms |
 
+### 6.7 RESP Encoding Optimization
+**Type:** Performance fix (documented 2026-10-17)
+
+**Problem:** LRANGE was 2x slower than Redis. CPU profile showed `fmt.Sprintf` consuming 57% of CPU time.
+
+**Root cause:** BulkString() used `fmt.Sprintf("$%d\r\n%s\r\n", len(s), s)` for every array element. For LRANGE_600, that's 600 fmt.Sprintf calls per request.
+
+**Fix:**
+```go
+// Before (slow)
+func BulkString(s string) string {
+    return fmt.Sprintf("$%d\r\n%s\r\n", len(s), s)
+}
+
+// After (fast)
+func BulkString(s string) string {
+    return "$" + strconv.Itoa(len(s)) + "\r\n" + s + "\r\n"
+}
+```
+
+Also optimized Array() to inline BulkString logic and pre-allocate builder:
+```go
+func Array(items []string) string {
+    var b strings.Builder
+    b.Grow(len(items)*20 + 10)  // Pre-allocate
+    // ... inline BulkString logic
+}
+```
+
+**Results:**
+| Command | Before | After | Improvement |
+|---------|--------|-------|-------------|
+| LRANGE_100 | 51K | 103K | **2x** |
+| LRANGE_300 | 20K | 41K | **2x** |
+| LRANGE_600 | 10K | 22K | **2.2x** |
+
+**Lesson:** `fmt.Sprintf` has significant overhead for hot paths. Use `strconv` + string concatenation for performance-critical encoding.
+
+### 6.8 Buffer Sizing
+**Type:** Tuning (documented 2026-10-17)
+
+**Changes:**
+1. Read buffer: 4KB → 16KB (fewer syscalls for pipelining)
+2. Accumulated buffer: Pre-allocated with `make([]byte, 0, 16384)` (avoids append reallocations)
+
+**Rationale:** Larger buffers reduce syscall frequency. Pre-allocation avoids GC pressure from repeated append growth.
+
+### 6.9 Why SpawnDB Outperforms Redis on Single Operations
+**Type:** Performance analysis (documented 2026-10-17)
+
+**Observation:** SpawnDB achieves 45-60% higher throughput than Redis on single-command operations at moderate concurrency (50 clients).
+
+**Investigation steps:**
+1. ✅ Verified not a localhost artifact (3 separate EC2 instances)
+2. ✅ Verified Redis persistence disabled (`save ""`, `appendonly no`)
+3. ✅ Cross-validated by running benchmark FROM Redis instance
+4. ✅ Same CPU, same kernel, same network
+
+**Root causes identified:**
+
+1. **Connection model efficiency at low concurrency:**
+   - SpawnDB: goroutine-per-connection (Go runtime scheduling)
+   - Redis: single-threaded event loop (epoll)
+   - At 50 clients, goroutine overhead < event loop fd scanning overhead
+
+2. **No feature tax:**
+   ```
+   Redis per-command: ACL check → memory tracking → keyspace notifications → 
+                      slow log → client tracking → DEBUG hooks → execute
+   SpawnDB per-command: parse → execute → respond
+   ```
+
+3. **Simpler data path:** Fewer layers between network and storage
+
+4. **Go's optimized network stack:** Platform-specific epoll integration, good buffering
+
+**When Redis wins:** High pipeline depth (2-3x faster), extreme concurrency (1000+ clients), and any production feature (durability, replication correctness, cluster).
+
+**Key insight:** A minimal implementation beats a feature-rich one on micro-benchmarks. This demonstrates understanding of where overhead comes from, not that SpawnDB is "better" than Redis.
+
 ---
 
 ## 7. Test Coverage
