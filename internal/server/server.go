@@ -52,8 +52,10 @@ func HandleConnection(conn net.Conn) {
 	client := &core.Client{Conn: conn}
 
 	// Pipelining buffers
-	readBuf := make([]byte, 4096)
-	var accumulated []byte
+	// - 16KB read buffer: larger reads = fewer syscalls, better for pipelining
+	// - Pre-allocated accumulated buffer: avoid repeated append allocations
+	readBuf := make([]byte, 16384)
+	accumulated := make([]byte, 0, 16384)
 	writer := bufio.NewWriter(conn)
 
 	for {

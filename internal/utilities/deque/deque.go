@@ -122,7 +122,10 @@ func (d *Deque[T]) At(i int) T {
 
 // Range appends elements in logical positions [start, stop] (inclusive) to dst
 // and returns it. Caller is responsible for clamping start/stop to [0, Len()-1];
-// if start > stop or the range is empty, dst is returned unchanged. O(stop-start).
+// if start > stop or the range is empty, dst is returned unchanged.
+//
+// Optimized: Uses bulk copy() for contiguous segments instead of per-element
+// append. Ring buffer may wrap, so we handle up to two contiguous chunks.
 func (d *Deque[T]) Range(dst []T, start, stop int) []T {
 	if start < 0 {
 		start = 0
@@ -130,9 +133,34 @@ func (d *Deque[T]) Range(dst []T, start, stop int) []T {
 	if stop >= d.size {
 		stop = d.size - 1
 	}
-	for i := start; i <= stop; i++ {
-		dst = append(dst, d.buf[d.index(i)])
+	if start > stop || d.size == 0 {
+		return dst
 	}
+
+	count := stop - start + 1
+	cap := len(d.buf)
+
+	// Physical start index
+	physStart := (d.head + start) & (cap - 1)
+	// Physical end index (inclusive)
+	physEnd := (d.head + stop) & (cap - 1)
+
+	// Ensure dst has enough capacity
+	if cap := len(dst) + count; cap > cap {
+		newDst := make([]T, len(dst), cap)
+		copy(newDst, dst)
+		dst = newDst
+	}
+
+	if physStart <= physEnd {
+		// Contiguous: single copy
+		dst = append(dst, d.buf[physStart:physEnd+1]...)
+	} else {
+		// Wrapped: two copies (physStart..end of buf, then 0..physEnd)
+		dst = append(dst, d.buf[physStart:]...)
+		dst = append(dst, d.buf[:physEnd+1]...)
+	}
+
 	return dst
 }
 

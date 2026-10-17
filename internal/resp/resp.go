@@ -201,7 +201,7 @@ func Error(msg string) string {
 
 // BulkString returns a RESP bulk string
 func BulkString(s string) string {
-	return fmt.Sprintf("$%d\r\n%s\r\n", len(s), s)
+	return "$" + strconv.Itoa(len(s)) + "\r\n" + s + "\r\n"
 }
 
 // NullBulkString returns RESP null bulk string ($-1\r\n)
@@ -227,11 +227,18 @@ func EmptyArray() string {
 // Array encodes a slice as RESP array and returns as string
 func Array(items []string) string {
 	var b strings.Builder
+	// Pre-calculate approximate size to avoid reallocations
+	// Each item: $len\r\n + data + \r\n (roughly len + 10)
+	b.Grow(len(items)*20 + 10)
 	b.WriteString("*")
 	b.WriteString(strconv.Itoa(len(items)))
 	b.WriteString("\r\n")
 	for _, item := range items {
-		b.WriteString(BulkString(item))
+		b.WriteString("$")
+		b.WriteString(strconv.Itoa(len(item)))
+		b.WriteString("\r\n")
+		b.WriteString(item)
+		b.WriteString("\r\n")
 	}
 	return b.String()
 }
